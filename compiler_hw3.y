@@ -17,6 +17,7 @@ void lookup_symbol(char*, bool, bool);
 void create_symbol();
 int lookupRegForInsertion(int);
 int lookupRegForJasmin(char*, int);
+void lookupVariable (int*, int*, char*, int)
 void insert_symbol(char*, char*, char*, int, bool);
 void dump_symbol(int);
 void makeError(bool, bool);
@@ -80,7 +81,6 @@ char argumentsType[32] = {0};
 %token <string> STR_CONST
 %token <bool_val> TRUE
 %token <bool_val> FALSE
-
 /* Nonterminal with return, which need to sepcify type */
 %type <string> type
 %type <string> id_expression
@@ -95,15 +95,17 @@ char argumentsType[32] = {0};
 %type <string> assignment_expression
 %type <string> logical_expression
 %type <string> relational_expression
-%type <string> arithmetic_expression
 %type <string> unary_expression
 %type <string> postfix_expression
 %type <string> primary_expression
 %type <string> constant
 
 // For arithmetic
+%type <string> additive_expression
+%type <string> multi_expression
 %type <string> arithmetic_operator
 %type <string> assignment_operator
+%type <string> cast_expression
 %start program
 
 /* Grammar section */
@@ -276,26 +278,48 @@ logical_expression
 ;
 
 relational_expression
-    : relational_expression relational_operator arithmetic_expression
-    | arithmetic_expression {
+    : relational_expression relational_operator additive_expression
+    | additive_expression {
         strcpy($$, $1);
     }
 ;
 
-arithmetic_expression
-    : arithmetic_expression arithmetic_operator unary_expression {
-        printf("arith: %s\n", $1);
-        printf("unary: %s\n", $3);
-        char s[32] = {0};
-        sprintf(s, "%s%s%s", $1, $2, $3);
-        printf("final %s\n", s);
-        // do smt
+additive_expression
+    : multi_expression
+    | additive_expression ADD multi_expression {
+        printf("In additive: %s %s\n", $1, $3);
     }
-    | unary_expression {
-        printf("in actual unary: %s\n", $1);
-        strcpy($$, $1);
-    }
+    | additive_expression SUB multi_expression
 ;
+
+multi_expression
+    : cast_expression
+    | multi_expression MUL cast_expression {
+        printf("%s%s\n", $1, $3);
+        sprintf($$, "%s %s\n", $1, $3);
+        // look up the table for this varaible
+        int reg, scopeOfVariable, reg1, scopeOfVariable1;
+        lookupVariable(&scopeOfVariable, &reg, $1, currentScope);
+        lookupVariable(&scopeOfVariable1, &reg1, $3, currentScope);
+    }
+    | multi_expression DIV cast_expression
+    | multi_expression MOD cast_expression
+;
+
+// arithmetic_expression
+//     : arithmetic_expression arithmetic_operator unary_expression {
+//         printf("arith: %s\n", $1);
+//         printf("unary: %s\n", $3);
+//         char s[32] = {0};
+//         sprintf(s, "%s%s%s", $1, $2, $3);
+//         printf("final %s\n", s);
+//         // do smt
+//     }
+//     | unary_expression {
+//         printf("in actual unary: %s\n", $1);
+//         strcpy($$, $1);
+//     }
+// ;
 
 relational_operator
     : MT
@@ -316,7 +340,9 @@ unary_expression
 ;
 
 cast_expression
-    : unary_expression
+    : unary_expression {
+        strcpy($$, $1);
+    }
     | LB type RB cast_expression
 ;
 
@@ -343,23 +369,23 @@ argument_expression_list
 	| argument_expression_list COMMA assignment_expression
 ;
 
-arithmetic_operator
-    : ADD {
-        strcpy($$, "+");
-    }
-    | SUB {
-        strcpy($$, "-");
-    }
-    | MUL {
-        strcpy($$, "*");
-    }
-    | DIV {
-        strcpy($$, "/");
-    }
-    | MOD {
-        strcpy($$, "%");
-    }
-;
+// arithmetic_operator
+//     : ADD {
+//         strcpy($$, "+");
+//     }
+//     | SUB {
+//         strcpy($$, "-");
+//     }
+//     | MUL {
+//         strcpy($$, "*");
+//     }
+//     | DIV {
+//         strcpy($$, "/");
+//     }
+//     | MOD {
+//         strcpy($$, "%");
+//     }
+// ;
 
 assignment_operator
 	: ASGN {
@@ -540,13 +566,28 @@ int lookupRegForInsertion(int scope) {
 }
 
 int lookupRegForJasmin (char* name, int scope) {
-    int cur;
+    int cur = -1;
     TRAVERSE_SINGLE_LIST_NEW(scope) {
         if (strcmp(ptr->name, name) == 0) {
            cur = ptr->reg;
         }
     }
     return cur;
+}
+
+void lookupVariable (int* targetScope, int* targetReg, char* name, int scope) {
+    for (int i = 0; i <= scope; i++) {
+        TRAVERSE_SINGLE_LIST_NEW(scope) {
+            if (strcmp(ptr->name, name) == 0) {
+                *targetScope = ptr->scope;
+                *targetReg = ptr->reg;
+                return;
+            }
+        }
+    }
+    // Not finding anything, it means the target is a number not a variable 
+    *targetScope = -1;
+    *targetReg = -1;
 }
 
 void lookup_symbol(char* targetId, bool isRe, bool isFunction) {
