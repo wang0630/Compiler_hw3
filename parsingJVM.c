@@ -71,16 +71,32 @@ void outputVariableDef(char* name, char* type, char* value, int scope, int reg) 
 
 void outputVariable(char* target, int reg, int scope, char* type, int which, char* target1, int reg1, int scope1, char* type1, int which1, char* op, char* exprType) {
   char str[512] = {0};
+  char doOp[16] = {0};
   determineVariable(target, reg, scope, type, type1, which, str);
   determineVariable(target1, reg1, scope1, type1, type, which1, str);
-  // If one of the operand is float
+  // If one of the operands is float
   if (strcmp(type, "float") == 0 || strcmp(type1, "float") == 0) {
     strcpy(exprType, "float");
+    sprintf(doOp, "\t%c", 'f');
   } else {
     strcpy(exprType, "int");
+    sprintf(doOp, "\t%c", 'i');
+  }
+  printf("op: %s\n", op);
+  // Check for operation
+  if (strcmp(op, "+") == 0) {
+    strcat(doOp, "ADD\n");
+  } else if(strcmp(op, "-") == 0) {
+    strcat(doOp, "SUB\n");
+  } else if(strcmp(op, "*") == 0) {
+    strcat(doOp, "MUL\n");
+  } else if(strcmp(op, "/") == 0) {
+    strcat(doOp, "DIV\n");
+  } else {
+    strcat(doOp, "MOD\n");
   }
 
-
+  strcat(str, doOp);
   writeJasminFile(str);
 }
 
