@@ -25,7 +25,7 @@ void resolveType(char* target, char* buf) {
 
 
 void outputFunctionDef(char* name, char* argumentsType, char* returnType) {
-  printf("%s %s %s \n", name, argumentsType, returnType);
+  // printf("%s %s %s \n", name, argumentsType, returnType);
   char str[512] = {0};
   if (strcmp(name, "main") == 0) {
     // Replace the argument list for main only
@@ -41,7 +41,7 @@ void outputFunctionDef(char* name, char* argumentsType, char* returnType) {
 }
 
 void outputVariableDef(char* name, char* type, char* value, int scope, int reg) {
-  printf("%s %s %s \n", name, type, value);
+  // printf("%s %s %s \n", name, type, value);
   char str[512] = {0};
   char typestr[16] = {0};
 
@@ -67,4 +67,56 @@ void outputVariableDef(char* name, char* type, char* value, int scope, int reg) 
     strcat(str, store1);
   }
   writeJasminFile(str);
+}
+
+void outputVariable(char* target, int reg, int scope, char* type, int which, char* target1, int reg1, int scope1, char* type1, int which1, char* op, char* exprType) {
+  char str[512] = {0};
+  determineVariable(target, reg, scope, type, type1, which, str);
+  determineVariable(target1, reg1, scope1, type1, type, which1, str);
+  // If one of the operand is float
+  if (strcmp(type, "float") == 0 || strcmp(type1, "float") == 0) {
+    strcpy(exprType, "float");
+  } else {
+    strcpy(exprType, "int");
+  }
+
+
+  writeJasminFile(str);
+}
+
+void determineVariable(char* target, int reg, int scope, char* type, char* type1, int which, char* str) {
+  // Load
+  char load[128] = {0};
+  switch(which) {
+    case 1: { // const
+      char* loadOp = "ldc";
+      sprintf(load, "\t%s %s\n", loadOp, target);
+      printf("load a constant: %s", load);
+      break;
+    }
+    case 2: { // expr
+      return;
+    }
+    case 3: {
+      if (scope != 0) {
+        char* loadOp = strcmp(type, "int") == 0 ? "iload" : "fload";
+        sprintf(load, "\t%s %d\n", loadOp, reg);
+        printf("load a local variable: %s", load);
+
+        // check for casting
+        if (strcmp(type, type1) != 0) {
+          if (strcmp(type, "int")) {
+            strcat(load, "\ti2f\n");
+          }
+        }
+      } else { // global
+        char* loadOp = "getstatic compiler_hw3/";
+        char tmp[5] = {0};
+        resolveType(type, tmp);
+        sprintf(load, "\t%s%s %s\n", loadOp, target, tmp);
+        printf("load global: %s", load);
+      }
+    }
+  }
+  strcat(str, load);
 }

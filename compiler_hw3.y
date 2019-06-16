@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include "./parsingJVM.h"
+#define bufSize 16
 extern int yylineno;
 extern int yylex();
 extern void yyerror(char*);
@@ -17,7 +18,7 @@ void lookup_symbol(char*, bool, bool);
 void create_symbol();
 int lookupRegForInsertion(int);
 int lookupRegForJasmin(char*, int);
-void lookupVariable (int*, int*, char*, int)
+int lookupVariable (int*, int*, char*, char*, int);
 void insert_symbol(char*, char*, char*, int, bool);
 void dump_symbol(int);
 void makeError(bool, bool);
@@ -44,6 +45,8 @@ int currentScope = 0;
 bool isError = false;
 bool shouldDumpNow = false;
 
+// For expr type
+char* exprType = NULL;
 // For function definiton
 char argumentsType[32] = {0};
 // travser through the list
@@ -103,7 +106,8 @@ char argumentsType[32] = {0};
 // For arithmetic
 %type <string> additive_expression
 %type <string> multi_expression
-%type <string> arithmetic_operator
+%type <string> arithmetic_higher_operator
+%type <string> arithmetic_lower_operator
 %type <string> assignment_operator
 %type <string> cast_expression
 %start program
@@ -286,40 +290,46 @@ relational_expression
 
 additive_expression
     : multi_expression
-    | additive_expression ADD multi_expression {
-        printf("In additive: %s %s\n", $1, $3);
+    | additive_expression arithmetic_lower_operator multi_expression {
+        if (!exprType) {
+            exprType = (char*)malloc(bufSize);
+        }
+        printf("In additive: %s + %s\n", $1, $3);
+        sprintf($$, "%s %s %s", $1, $2, $3);
+        int reg, scopeOfVariable, reg1, scopeOfVariable1;
+        int which, which1;
+        char t[16] = {0}, t1[16] = {0};
+        if (!exprType) {
+            exprType = (char*)malloc(bufSize);
+            memset(exprType, 0, bufSize);
+        }
+        which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
+        printf("aaaaa: %s %d\n", $1, which);
+        which1 = lookupVariable(&scopeOfVariable1, &reg1, t1, $3, currentScope);
+        outputVariable($1, reg, scopeOfVariable, t, which, $3, reg1, scopeOfVariable1, t1, which1, $2, exprType);
     }
-    | additive_expression SUB multi_expression
 ;
 
 multi_expression
     : cast_expression
-    | multi_expression MUL cast_expression {
-        printf("%s%s\n", $1, $3);
-        sprintf($$, "%s %s\n", $1, $3);
+    | multi_expression arithmetic_higher_operator cast_expression {
+        printf("in mul: %s * %s\n", $1, $3);
+        sprintf($$, "%s %s %s", $1, $2, $3);
+        // sprintf($$, "break");
         // look up the table for this varaible
         int reg, scopeOfVariable, reg1, scopeOfVariable1;
-        lookupVariable(&scopeOfVariable, &reg, $1, currentScope);
-        lookupVariable(&scopeOfVariable1, &reg1, $3, currentScope);
-    }
-    | multi_expression DIV cast_expression
-    | multi_expression MOD cast_expression
-;
+        int which, which1;
+        char t[16] = {0}, t1[16] = {0};
+        if (!exprType) {
+            exprType = (char*)malloc(bufSize);
+            memset(exprType, 0, bufSize);
+        }
+        which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
+        which1 = lookupVariable(&scopeOfVariable1, &reg1, t1, $3, currentScope);
+        outputVariable($1, reg, scopeOfVariable, t, which, $3, reg1, scopeOfVariable1, t1, which1, $2, exprType);
 
-// arithmetic_expression
-//     : arithmetic_expression arithmetic_operator unary_expression {
-//         printf("arith: %s\n", $1);
-//         printf("unary: %s\n", $3);
-//         char s[32] = {0};
-//         sprintf(s, "%s%s%s", $1, $2, $3);
-//         printf("final %s\n", s);
-//         // do smt
-//     }
-//     | unary_expression {
-//         printf("in actual unary: %s\n", $1);
-//         strcpy($$, $1);
-//     }
-// ;
+    }
+;
 
 relational_operator
     : MT
@@ -369,23 +379,27 @@ argument_expression_list
 	| argument_expression_list COMMA assignment_expression
 ;
 
-// arithmetic_operator
-//     : ADD {
-//         strcpy($$, "+");
-//     }
-//     | SUB {
-//         strcpy($$, "-");
-//     }
-//     | MUL {
-//         strcpy($$, "*");
-//     }
-//     | DIV {
-//         strcpy($$, "/");
-//     }
-//     | MOD {
-//         strcpy($$, "%");
-//     }
-// ;
+arithmetic_lower_operator
+    : ADD {
+        strcpy($$ , "+");
+    }
+    | SUB {
+        strcpy($$ , "-");
+    }
+;
+
+
+arithmetic_higher_operator
+    : MUL {
+        strcpy($$ , "*");
+    }
+    | DIV {
+        strcpy($$ , "/");
+    }
+    | MOD {
+        strcpy($$ , "%");
+    }
+;
 
 assignment_operator
 	: ASGN {
@@ -494,7 +508,7 @@ void insert_symbol(char* myType, char* name, char* entryType, int myScope, bool 
     } else {
         node->reg = -1;
     }
-    printf("reg for: %d\n", node->reg);
+    // printf("reg for %s: %d\n", node->name, node->reg);
     strcpy(node->name, name);
     strcpy(node->entryType, entryType);
     strcpy(node->myType,myType);
@@ -575,19 +589,45 @@ int lookupRegForJasmin (char* name, int scope) {
     return cur;
 }
 
-void lookupVariable (int* targetScope, int* targetReg, char* name, int scope) {
+int lookupVariable (int* targetScope, int* targetReg, char* targetType, char* name, int scope) {
     for (int i = 0; i <= scope; i++) {
-        TRAVERSE_SINGLE_LIST_NEW(scope) {
+        TRAVERSE_SINGLE_LIST_NEW(i) {
             if (strcmp(ptr->name, name) == 0) {
                 *targetScope = ptr->scope;
                 *targetReg = ptr->reg;
-                return;
+                strcpy(targetType, ptr->myType);
+                printf("find %s\n", ptr->name);
+                return 3;
             }
         }
     }
-    // Not finding anything, it means the target is a number not a variable 
+    // Not finding anything, it means the target is a number or an expression not a variable 
     *targetScope = -1;
     *targetReg = -1;
+    // find out if this variable is a const
+    bool isExpr = false;
+    bool isFloat = false;
+    for (int i = 0; i < strlen(name); i++) {
+        if ((name[i] >= 48 && name[i] <= 57) || name[i] == 45) {
+            ;
+        } else if (name[i] == 46) {
+            isFloat = true;
+        } else {
+            isExpr = true;
+            // Put the type of the expression
+            strcpy(targetType, exprType);
+            return 2;
+        }
+    }
+
+    if (isFloat) {
+        strcpy(targetType, "float");
+        return 1;
+    } else {
+        strcpy(targetType, "int");
+        return 1;
+    }
+    
 }
 
 void lookup_symbol(char* targetId, bool isRe, bool isFunction) {
