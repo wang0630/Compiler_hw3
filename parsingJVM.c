@@ -72,8 +72,8 @@ void outputVariableDef(char* name, char* type, char* value, int scope, int reg) 
 void outputVariable(char* target, int reg, int scope, char* type, int which, char* target1, int reg1, int scope1, char* type1, int which1, char* op, char* exprType) {
   char str[512] = {0};
   char doOp[16] = {0};
-  determineVariable(target, reg, scope, type, type1, which, str);
-  determineVariable(target1, reg1, scope1, type1, type, which1, str);
+  determineVariables(target, reg, scope, type, type1, which, str);
+  determineVariables(target1, reg1, scope1, type1, type, which1, str);
   // If one of the operands is float
   if (strcmp(type, "float") == 0 || strcmp(type1, "float") == 0) {
     strcpy(exprType, "float");
@@ -100,7 +100,7 @@ void outputVariable(char* target, int reg, int scope, char* type, int which, cha
   writeJasminFile(str);
 }
 
-void determineVariable(char* target, int reg, int scope, char* type, char* type1, int which, char* str) {
+void determineVariables(char* target, int reg, int scope, char* type, char* type1, int which, char* str) {
   // Load
   char load[128] = {0};
   switch(which) {
@@ -153,6 +153,27 @@ void determineVariable(char* target, int reg, int scope, char* type, char* type1
     }
   }
   strcat(str, load);
+}
+
+
+void determineAndOutputOneVariable(char* target, int reg, char* type) {
+  char str[512] = {0};
+  char loadOp[32] = {0};
+  switch(reg) {
+    case 0: // global variable
+      strcpy(loadOp, "getstatic compiler_hw3/");
+      char tmp[5] = {0};
+      resolveType(type, tmp);
+      sprintf(str, "\t%s%s %s\n", loadOp, target, tmp);
+      break;
+    case -1: // const
+      sprintf(str, "\tldc %s\n", target);
+      break;
+    default: // local variable
+      strcpy(loadOp, strcmp(type, "float") == 0 ? "fload" : "iload");
+      sprintf(str, "\t%s %d\n", loadOp, reg);
+  }
+  writeJasminFile(str);
 }
 
 void outputAssignment(char* leftType, int leftReg, char* rightType, char* op) {

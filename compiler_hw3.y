@@ -266,13 +266,27 @@ return_expression
 
 assignment_expression
 	: unary_expression assignment_operator logical_expression {
-        printf("assign: %s\n", $1);
-        printf("current expr: %s\n", exprType);
+        printf("assign: %s\n", $3);
         int reg, scopeOfVariable;
         char t[16] = {0};
         int which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
         // Do the assignment
+        // if exprType is NULL, meaning that there is only one thing on the right handside
+        // ex. a = 3;
+        // need tp look up for the 3
+        if (!exprType) {
+            int reg, scopeOfVariable;
+            char t[16] = {0};
+            int which = lookupVariable(&scopeOfVariable, &reg, t, $3, currentScope);
+            exprType = (char*)malloc(bufSize);
+            // Put the type to exprType
+            // Since outputAssignment() only cares about the type of right hand side
+            strcpy(exprType, t);
+            determineAndOutputOneVariable($3, reg, t);
+        }
         outputAssignment(t, reg, exprType, $2);
+        free(exprType);
+        exprType = NULL;
     }
     | logical_expression {
         strcpy($$, $1);
@@ -331,7 +345,6 @@ multi_expression
         which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
         which1 = lookupVariable(&scopeOfVariable1, &reg1, t1, $3, currentScope);
         outputVariable($1, reg, scopeOfVariable, t, which, $3, reg1, scopeOfVariable1, t1, which1, $2, exprType);
-
     }
 ;
 
@@ -528,7 +541,7 @@ void insert_symbol(char* myType, char* name, char* entryType, int myScope, bool 
             sprintf(tmp, "%s%s", ", ", myType);
             strcat(parameters, tmp);
             // printf("2 parameters: %s\n", parameters);
-        } 
+        }
     }
 
     if (strcmp(entryType, "function") == 0) {
