@@ -266,7 +266,13 @@ return_expression
 
 assignment_expression
 	: unary_expression assignment_operator logical_expression {
-
+        printf("assign: %s\n", $1);
+        printf("current expr: %s\n", exprType);
+        int reg, scopeOfVariable;
+        char t[16] = {0};
+        int which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
+        // Do the assignment
+        outputAssignment(t, reg, exprType, $2);
     }
     | logical_expression {
         strcpy($$, $1);
@@ -304,7 +310,6 @@ additive_expression
             memset(exprType, 0, bufSize);
         }
         which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
-        printf("aaaaa: %s %d\n", $1, which);
         which1 = lookupVariable(&scopeOfVariable1, &reg1, t1, $3, currentScope);
         outputVariable($1, reg, scopeOfVariable, t, which, $3, reg1, scopeOfVariable1, t1, which1, $2, exprType);
     }
@@ -315,7 +320,6 @@ multi_expression
     | multi_expression arithmetic_higher_operator cast_expression {
         printf("in mul: %s * %s\n", $1, $3);
         sprintf($$, "%s %s %s", $1, $2, $3);
-        // sprintf($$, "break");
         // look up the table for this varaible
         int reg, scopeOfVariable, reg1, scopeOfVariable1;
         int which, which1;

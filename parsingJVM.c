@@ -85,15 +85,15 @@ void outputVariable(char* target, int reg, int scope, char* type, int which, cha
   printf("op: %s\n", op);
   // Check for operation
   if (strcmp(op, "+") == 0) {
-    strcat(doOp, "ADD\n");
+    strcat(doOp, "add\n");
   } else if(strcmp(op, "-") == 0) {
-    strcat(doOp, "SUB\n");
+    strcat(doOp, "sub\n");
   } else if(strcmp(op, "*") == 0) {
-    strcat(doOp, "MUL\n");
+    strcat(doOp, "mul\n");
   } else if(strcmp(op, "/") == 0) {
-    strcat(doOp, "DIV\n");
+    strcat(doOp, "div\n");
   } else {
-    strcat(doOp, "MOD\n");
+    strcat(doOp, "rem\n");
   }
 
   strcat(str, doOp);
@@ -108,6 +108,14 @@ void determineVariable(char* target, int reg, int scope, char* type, char* type1
       char* loadOp = "ldc";
       sprintf(load, "\t%s %s\n", loadOp, target);
       printf("load a constant: %s", load);
+      // check for casting
+      if (strcmp(type, type1) != 0) {
+        // printf("type: %s %s\n", type, type1);
+        if (strcmp(type, "int") == 0) {
+          // printf("who is the target: %s\n", target);
+          strcat(load, "\ti2f\n");
+        }
+      }
       break;
     }
     case 2: { // expr
@@ -121,7 +129,9 @@ void determineVariable(char* target, int reg, int scope, char* type, char* type1
 
         // check for casting
         if (strcmp(type, type1) != 0) {
-          if (strcmp(type, "int")) {
+          // printf("type: %s %s\n", type, type1);
+          if (strcmp(type, "int") == 0) {
+            // printf("who is the target: %s\n", target);
             strcat(load, "\ti2f\n");
           }
         }
@@ -131,8 +141,40 @@ void determineVariable(char* target, int reg, int scope, char* type, char* type1
         resolveType(type, tmp);
         sprintf(load, "\t%s%s %s\n", loadOp, target, tmp);
         printf("load global: %s", load);
+         // check for casting
+        if (strcmp(type, type1) != 0) {
+          // printf("type: %s %s\n", type, type1);
+          if (strcmp(type, "int") == 0) {
+            // printf("who is the target: %s\n", target);
+            strcat(load, "\ti2f\n");
+          }
+        }
       }
     }
   }
   strcat(str, load);
+}
+
+void outputAssignment(char* leftType, int leftReg, char* rightType, char* op) {
+  char str[512] = {0};
+  if (strcmp(leftType, rightType) != 0 && strcmp(leftType, "bool") != 0) {
+    // Do the implicit casting according to the type of the left side operand
+    // if a = 3.4;
+    // and a is int, we should have f2i
+    char convert[8] = {0};
+    if (strcmp(leftType, "int") == 0) {
+      strcpy(convert, "\tf2i\n");
+    } else {
+      strcpy(convert, "\ti2f\n");
+    }
+    strcat(str, convert);
+  }
+  char s[64] = {0};
+  if (leftReg == -1) { // global
+
+  } else { // local
+    sprintf(s, "\t%cstore %d\n", strcmp(leftType, "float") == 0 ? 'f' : 'i', leftReg);
+  }
+  strcat(str, s);
+  writeJasminFile(str);
 }
