@@ -19,7 +19,8 @@ void create_symbol();
 int lookupRegForInsertion(int);
 int lookupRegForJasmin(char*, int);
 int lookupVariable (int*, int*, char*, char*, int);
-void insert_symbol(char*, char*, char*, int, bool);
+void lookupFunction(char* name, char* returnType, char* parametersList);
+void insert_symbol(char*, char*, char*, char*, int, bool);
 void dump_symbol(int);
 void makeError(bool, bool);
 void yySemError(char*);
@@ -29,6 +30,7 @@ typedef struct variable {
     char name[32];
     char entryType[16];
     char myType[16];
+    char returnType[16];
     int reg;
     int scope;
     char* formalParameters;
@@ -48,6 +50,8 @@ bool shouldDumpNow = false;
 // For expr type
 char* exprType = NULL;
 // For function definiton
+char parametersType[64] = {0};
+// for function call
 char argumentsType[64] = {0};
 
 // travser through the list
@@ -133,7 +137,7 @@ stat
 
 declaration
     : type id_expression ASGN expression SEMICOLON {
-        insert_symbol($1, $2, "variable", currentScope, false);
+        insert_symbol($1, $2, "variable", NULL, currentScope, false);
         int reg = -1;
         if (currentScope != 0) {
             reg = lookupRegForJasmin($2, currentScope);
@@ -141,7 +145,7 @@ declaration
         outputVariableDef($2, $1, $4, currentScope, reg);
      }
     | type id_expression SEMICOLON {
-        insert_symbol($1, $2, "variable", currentScope, false);
+        insert_symbol($1, $2, "variable", NULL, currentScope, false);
         int reg = -1;
         if (currentScope != 0) {
             reg = lookupRegForJasmin($2, currentScope);
@@ -149,31 +153,31 @@ declaration
         outputVariableDef($2, $1, NULL, currentScope, reg);
     }
     | type id_expression LB func_item_list RB {
-        insert_symbol($1, $2, "function", currentScope, false);
+        insert_symbol($1, $2, "function", $1, currentScope, false);
         char returnType[16] = {0};
         resolveType($1, returnType);
-        outputFunctionDef($2, argumentsType, returnType);
+        outputFunctionDef($2, parametersType, returnType);
     }
     | type id_expression LB func_item_list RB SEMICOLON {
-        insert_symbol($1, $2, "function", currentScope, true);
+        insert_symbol($1, $2, "function", $1, currentScope, true);
     }
 ;
 
 func_item_list
     : func_item_list COMMA func_item {
         // printf("In func_item_list of %s\n", $3);
-        resolveType($3, argumentsType);
-        // printf("argument %s\n", argumentsType);
+        resolveType($3, parametersType);
+        // printf("argument %s\n", parametersType);
     }
     | func_item {
         // printf("In func_item_list of last one %s\n", $1);
-        resolveType($1, argumentsType);
+        resolveType($1, parametersType);
     }
 ;
 
 func_item
     : type id_expression {
-        insert_symbol($1, $2, "parameter", currentScope + 1, false);
+        insert_symbol($1, $2, "parameter", NULL, currentScope + 1, false);
         // printf("In func_item\n");
         strcpy($$, $1);
     }
@@ -402,22 +406,53 @@ postfix_expression
         strcpy($$, $1);
     }
 	| postfix_expression LB RB {
+        printf("in postfix_expression: %s\n", $1);
+        // Function call without argument
+        // first lookup if this function exists
+        // if so, we lookup for this function
+        char returnType[16] = {0};
+        char parametersList[16] = {0};
+        lookupFunction($1, returnType, parametersList);
         if (isError) {
             makeError(false, true);
         } 
     }
 	| postfix_expression LB argument_expression_list RB  {
+        // Function call with argument
+        printf("in postfix_expression with argu: %s\n", $1);
+        char returnType[16] = {0};
+        char parametersList[32] = {0};
+        lookupFunction($1, returnType, parametersList);
+        // printf("rrr: %s %s\n", returnType, parameters);
+        char buf[16] = {0};
+        resolveType(returnType, buf);
         if (isError) {
             makeError(false, true);
-        } 
+        }
     }
 	| postfix_expression INC
 	| postfix_expression DEC
 ;
 
 argument_expression_list
-	: assignment_expression
-	| argument_expression_list COMMA assignment_expression
+	: assignment_expression {
+        // printf("in lislllllt: %s\n", $1);
+        int reg, scopeOfVariable, which;
+        char t[16] = {0};
+        which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
+        determineAndOutputOneVariable($1, reg, which, t);
+        resolveType(t, argumentsType);
+        printf("in lislllllt: %s\n", argumentsType);
+    }
+	| argument_expression_list COMMA assignment_expression {
+        // printf("in list left: %s\n", $3);
+        int reg, scopeOfVariable, which;
+        char t[16] = {0};
+        which = lookupVariable(&scopeOfVariable, &reg, t, $3, currentScope);
+        determineAndOutputOneVariable($3, reg, which, t);
+        resolveType(t, argumentsType);
+        printf("in left: %s\n", argumentsType);
+    }
 ;
 
 arithmetic_lower_operator
@@ -534,7 +569,7 @@ void create_symbol() {
     }
 }
 
-void insert_symbol(char* myType, char* name, char* entryType, int myScope, bool isForward) {
+void insert_symbol(char* myType, char* name, char* entryType, char* returnType, int myScope, bool isForward) {
     // Create the new node
     variable_t* node = (variable_t*)malloc(sizeof(variable_t));
     // printf("currr: %s\n", name);
@@ -549,7 +584,10 @@ void insert_symbol(char* myType, char* name, char* entryType, int myScope, bool 
     } else {
         node->reg = -1;
     }
-    // printf("reg for %s: %d\n", node->name, node->reg);
+    // If returnType != NULL, meaning that this node is a function
+    if (returnType) {
+        strcpy(node->returnType, returnType);
+    }
     strcpy(node->name, name);
     strcpy(node->entryType, entryType);
     strcpy(node->myType,myType);
@@ -667,8 +705,21 @@ int lookupVariable (int* targetScope, int* targetReg, char* targetType, char* na
     } else {
         strcpy(targetType, "int");
         return 1;
+    }   
+}
+
+void lookupFunction(char* name, char* returnType, char* parametersList) {
+    // Functions are only declared in global scope
+    TRAVERSE_SINGLE_LIST_NEW(0) {
+        if (strcmp(ptr->name, name) == 0) {
+            printf("find the function %s\n", name);
+            strcpy(returnType, ptr->returnType);
+            if (ptr->formalParameters) {
+                strcpy(parametersList, ptr->formalParameters);
+            }
+            return;
+        }
     }
-    
 }
 
 void lookup_symbol(char* targetId, bool isRe, bool isFunction) {
