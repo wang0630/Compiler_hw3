@@ -48,7 +48,8 @@ bool shouldDumpNow = false;
 // For expr type
 char* exprType = NULL;
 // For function definiton
-char argumentsType[32] = {0};
+char argumentsType[64] = {0};
+
 // travser through the list
 #define TRAVERSE_SINGLE_LIST(i) for (variable_t* ptr = symbolTable[i]; ptr; ptr = ptr->next)
 #define TRAVERSE_SINGLE_LIST_NEW(i) for (variable_t* ptr = symbolTable[i]->next; ptr; ptr = ptr->next)
@@ -149,7 +150,7 @@ declaration
     }
     | type id_expression LB func_item_list RB {
         insert_symbol($1, $2, "function", currentScope, false);
-        char returnType[5] = {0};
+        char returnType[16] = {0};
         resolveType($1, returnType);
         outputFunctionDef($2, argumentsType, returnType);
     }
@@ -181,7 +182,15 @@ func_item
 
 compound_stat
     : LCB RCB
-    | LCB { ++currentScope; } block_item_list RCB  { shouldDumpNow = true; --currentScope; }
+    | LCB { ++currentScope; } block_item_list RCB  {
+        shouldDumpNow = true;
+        if (currentScope == 1) {
+            // Generate end method to Jasmin
+            char* str = ".end method";
+            writeJasminFile(str);
+        }
+        --currentScope;
+    }
 ;
 
 block_item_list
@@ -199,8 +208,20 @@ expression_stat
 ;
 
 print_func
-    : PRINT LB QUOTA STR_CONST QUOTA RB SEMICOLON
-    | PRINT LB primary_expression RB SEMICOLON
+    : PRINT LB QUOTA STR_CONST QUOTA RB SEMICOLON {
+        // load the string
+       determineAndOutputOneVariable($4, -1, 1, NULL);
+       outputPrintFuc($4, "Ljava/lang/String;");
+    }
+    | PRINT LB primary_expression RB SEMICOLON {
+        // load either global or variable
+        int reg, scopeOfVariable, which;
+        char t[16] = {0};
+        which = lookupVariable(&scopeOfVariable, &reg, t, $3, currentScope);
+        printf("which in print: %d\n", which);
+        determineAndOutputOneVariable($3, reg, which, t);
+        outputPrintFuc($3, t);
+    }
 ;
 
 primary_expression
@@ -260,7 +281,10 @@ expression
 ;
 
 return_expression
-    : RET SEMICOLON
+    : RET SEMICOLON {
+        char* r = "\treturn\n";
+        writeJasminFile(r);
+    }
     | RET assignment_expression SEMICOLON
 ;
 
@@ -282,7 +306,7 @@ assignment_expression
             // Put the type to exprType
             // Since outputAssignment() only cares about the type of right hand side
             strcpy(exprType, t);
-            determineAndOutputOneVariable($3, reg, t);
+            determineAndOutputOneVariable($3, reg, which, t);
         }
         outputAssignment(t, reg, exprType, $2);
         free(exprType);

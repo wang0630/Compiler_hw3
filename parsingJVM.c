@@ -4,7 +4,7 @@
 
 void writeJasminFile(char* str) {
   FILE* fp;
-  fp = fopen("hw3.j", "a+");
+  fp = fopen("compiler_hw3.j", "a+");
   fwrite(str, 1, strlen(str), fp);
   fclose(fp);
 }
@@ -17,7 +17,7 @@ void resolveType(char* target, char* buf) {
   } else if (strcmp(target, "bool") == 0) {
     strcat(buf, "Z");
   } else if(strcmp(target, "string") == 0){
-    strcat(buf, "S");
+    strcat(buf, "Ljava/lang/String");
   } else {
     strcat(buf, "V");
   }
@@ -43,7 +43,7 @@ void outputFunctionDef(char* name, char* argumentsType, char* returnType) {
 void outputVariableDef(char* name, char* type, char* value, int scope, int reg) {
   // printf("%s %s %s \n", name, type, value);
   char str[512] = {0};
-  char typestr[16] = {0};
+  char typestr[32] = {0};
 
   // Global variable
   if (scope == 0) {
@@ -71,7 +71,7 @@ void outputVariableDef(char* name, char* type, char* value, int scope, int reg) 
 
 void outputVariable(char* target, int reg, int scope, char* type, int which, char* target1, int reg1, int scope1, char* type1, int which1, char* op, char* exprType) {
   char str[512] = {0};
-  char doOp[16] = {0};
+  char doOp[32] = {0};
   determineVariables(target, reg, scope, type, type1, which, str);
   determineVariables(target1, reg1, scope1, type1, type, which1, str);
   // If one of the operands is float
@@ -156,22 +156,23 @@ void determineVariables(char* target, int reg, int scope, char* type, char* type
 }
 
 
-void determineAndOutputOneVariable(char* target, int reg, char* type) {
+void determineAndOutputOneVariable(char* target, int reg, int which, char* type) {
   char str[512] = {0};
-  char loadOp[32] = {0};
-  switch(reg) {
-    case 0: // global variable
-      strcpy(loadOp, "getstatic compiler_hw3/");
-      char tmp[5] = {0};
-      resolveType(type, tmp);
-      sprintf(str, "\t%s%s %s\n", loadOp, target, tmp);
+  char loadOp[64] = {0};
+  switch(which) {
+    case 3: // variable
+      if(reg == -1) { // global
+        strcpy(loadOp, "getstatic compiler_hw3/");
+        char tmp[16] = {0};
+        resolveType(type, tmp);
+        sprintf(str, "\t%s%s %s\n", loadOp, target, tmp);
+      } else {
+        strcpy(loadOp, strcmp(type, "float") == 0 ? "fload" : "iload");
+        sprintf(str, "\t%s %d\n", loadOp, reg);
+      }
       break;
-    case -1: // const
+    case 1: // const
       sprintf(str, "\tldc %s\n", target);
-      break;
-    default: // local variable
-      strcpy(loadOp, strcmp(type, "float") == 0 ? "fload" : "iload");
-      sprintf(str, "\t%s %d\n", loadOp, reg);
   }
   writeJasminFile(str);
 }
@@ -197,5 +198,14 @@ void outputAssignment(char* leftType, int leftReg, char* rightType, char* op) {
     sprintf(s, "\t%cstore %d\n", strcmp(leftType, "float") == 0 ? 'f' : 'i', leftReg);
   }
   strcat(str, s);
+  writeJasminFile(str);
+}
+
+void outputPrintFuc(char* target, char* type) {
+  char str[512] = {0};
+  char* op = "\tgetstatic java/lang/System/out Ljava/io/PrintStream;\n\tswap\n\tinvokevirtual java/io/PrintStream/println";
+  char buf[16] = {0};
+  resolveType(type, buf);
+  sprintf(str, "%s(%s)V\n", op, buf);
   writeJasminFile(str);
 }
