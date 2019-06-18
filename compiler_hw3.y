@@ -20,7 +20,8 @@ int lookupRegForInsertion(int);
 int lookupRegForJasmin(char*, int);
 int lookupVariable (int*, int*, char*, char*, int);
 void lookupFunction(char* name, char* returnType, char* parametersList);
-void insert_symbol(char*, char*, char*, char*, int, bool);
+void processingFunctionCall(char* target, bool hasParameters);
+void insert_symbol(char*, char*, char*, int, bool);
 void dump_symbol(int);
 void makeError(bool, bool);
 void yySemError(char*);
@@ -30,7 +31,6 @@ typedef struct variable {
     char name[32];
     char entryType[16];
     char myType[16];
-    char returnType[16];
     int reg;
     int scope;
     char* formalParameters;
@@ -137,7 +137,7 @@ stat
 
 declaration
     : type id_expression ASGN expression SEMICOLON {
-        insert_symbol($1, $2, "variable", NULL, currentScope, false);
+        insert_symbol($1, $2, "variable", currentScope, false);
         int reg = -1;
         if (currentScope != 0) {
             reg = lookupRegForJasmin($2, currentScope);
@@ -145,7 +145,7 @@ declaration
         outputVariableDef($2, $1, $4, currentScope, reg);
      }
     | type id_expression SEMICOLON {
-        insert_symbol($1, $2, "variable", NULL, currentScope, false);
+        insert_symbol($1, $2, "variable", currentScope, false);
         int reg = -1;
         if (currentScope != 0) {
             reg = lookupRegForJasmin($2, currentScope);
@@ -153,13 +153,14 @@ declaration
         outputVariableDef($2, $1, NULL, currentScope, reg);
     }
     | type id_expression LB func_item_list RB {
-        insert_symbol($1, $2, "function", $1, currentScope, false);
+        insert_symbol($1, $2, "function", currentScope, false);
         char returnType[16] = {0};
         resolveType($1, returnType);
         outputFunctionDef($2, parametersType, returnType);
+        memset(parametersType, 0, sizeof(parametersType));
     }
     | type id_expression LB func_item_list RB SEMICOLON {
-        insert_symbol($1, $2, "function", $1, currentScope, true);
+        insert_symbol($1, $2, "function", currentScope, true);
     }
 ;
 
@@ -177,7 +178,7 @@ func_item_list
 
 func_item
     : type id_expression {
-        insert_symbol($1, $2, "parameter", NULL, currentScope + 1, false);
+        insert_symbol($1, $2, "parameter", currentScope + 1, false);
         // printf("In func_item\n");
         strcpy($$, $1);
     }
@@ -222,7 +223,7 @@ print_func
         int reg, scopeOfVariable, which;
         char t[16] = {0};
         which = lookupVariable(&scopeOfVariable, &reg, t, $3, currentScope);
-        printf("which in print: %d\n", which);
+        // printf("which in print: %d\n", which);
         determineAndOutputOneVariable($3, reg, which, t);
         outputPrintFuc($3, t);
     }
@@ -230,7 +231,7 @@ print_func
 
 primary_expression
 	: ID {
-        printf("IDzzssss: %s\n", yytext);
+        // printf("IDzzssss: %s\n", yytext);
         lookup_symbol(yytext, false, false);
         if (isError) {
             makeError(false, false);
@@ -291,7 +292,18 @@ return_expression
         char* r = "\treturn\n";
         writeJasminFile(r);
     }
-    | RET assignment_expression SEMICOLON
+    | RET assignment_expression SEMICOLON {
+        printf("in return: %s\n", $2);
+        printf("exprType: %s\n", exprType);
+        int reg, scopeOfVariable;
+        char t[16] = {0};
+        lookupVariable(&scopeOfVariable, &reg, t, $2, currentScope);
+        char* r = strcmp(t, "int") == 0 ? "\tireturn\n" : "\tfreturn\n";
+        writeJasminFile(r);
+        // Free exprType since it won't be used after this return
+        free(exprType);
+        exprType = NULL;
+    }
 ;
 
 assignment_expression
@@ -304,6 +316,7 @@ assignment_expression
         // ex. a = 3;
         // need tp look up for the 3
         if (!exprType) {
+            // printf("one stuff\n");
             int reg, scopeOfVariable;
             char t[16] = {0};
             int which = lookupVariable(&scopeOfVariable, &reg, t, $3, currentScope);
@@ -311,6 +324,7 @@ assignment_expression
             // Put the type to exprType
             // Since outputAssignment() only cares about the type of right hand side
             strcpy(exprType, t);
+            // printf("inside one: %s\n", exprType);
             determineAndOutputOneVariable($3, reg, which, t);
         }
         outputAssignment(t, reg, exprType, $2);
@@ -343,15 +357,11 @@ additive_expression
         if (!exprType) {
             exprType = (char*)malloc(bufSize);
         }
-        printf("In additive: %s + %s\n", $1, $3);
+        //printf("In additive: %s + %s\n", $1, $3);
         sprintf($$, "%s %s %s", $1, $2, $3);
         int reg, scopeOfVariable, reg1, scopeOfVariable1;
         int which, which1;
         char t[16] = {0}, t1[16] = {0};
-        if (!exprType) {
-            exprType = (char*)malloc(bufSize);
-            memset(exprType, 0, bufSize);
-        }
         which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
         which1 = lookupVariable(&scopeOfVariable1, &reg1, t1, $3, currentScope);
         outputVariable($1, reg, scopeOfVariable, t, which, $3, reg1, scopeOfVariable1, t1, which1, $2, exprType);
@@ -360,10 +370,9 @@ additive_expression
 
 multi_expression
     : cast_expression {
-        printf("in casting %s\n", $1);
+        // printf("in casting %s\n", $1);
     }
     | multi_expression arithmetic_higher_operator cast_expression {
-        printf("here: %s %s %s\n", $1, $2, $3);
         sprintf($$, "%s %s %s", $1, $2, $3);
         // look up the table for this varaible
         int reg, scopeOfVariable, reg1, scopeOfVariable1;
@@ -406,44 +415,29 @@ cast_expression
 
 postfix_expression
 	: primary_expression {
-        printf("return from primary: %s\n", $1);
+        //printf("return from primary: %s\n", $1);
         strcpy($$, $1);
     }
 	| postfix_expression LB RB {
-        printf("in postfix_expression: %s\n", $1);
+       // printf("in postfix_expression: %s\n", $1);
         // Function call without argument
         // first lookup if this function exists
         // if so, we lookup for this function
-        char returnType[16] = {0};
-        char parametersList[16] = {0};
-        lookupFunction($1, returnType, parametersList);
-        // Get returnType
-        char buf[16] = {0};
-        resolveType(returnType, buf);
-        outputFunctionCall($1, buf, NULL);
+        processingFunctionCall($1, false);
         if (isError) {
             makeError(false, true);
         }
     }
 	| postfix_expression LB argument_expression_list RB  {
         // Function call with argument
-        printf("in postfix_expression with argu: %s\n", $1);
-        char returnType[16] = {0};
-        char parametersList[32] = {0};
-        lookupFunction($1, returnType, parametersList);
-        // Get returnType
-        char buf[16] = {0};
-        char buf1[32] = {0};
-        resolveType(returnType, buf);
-        // convert from int, int to II
-        convertParameters(parametersList, buf1);
-        outputFunctionCall($1, buf, buf1);
+        // printf("in postfix_expression with argu: %s\n", $1);
+        processingFunctionCall($1, true);
         if (isError) {
             makeError(false, true);
         }
 
         // clear the parametersList(ex. III) buffer
-        memset(parametersList, 0, sizeof(parametersList));
+        // memset(parametersList, 0, sizeof(parametersList));
     }
 	| postfix_expression INC
 	| postfix_expression DEC
@@ -457,7 +451,7 @@ argument_expression_list
         which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
         determineAndOutputOneVariable($1, reg, which, t);
         resolveType(t, argumentsType);
-        printf("in lislllllt: %s\n", argumentsType);
+        // printf("in lislllllt: %s\n", argumentsType);
     }
 	| argument_expression_list COMMA assignment_expression {
         // printf("in list left: %s\n", $3);
@@ -466,7 +460,7 @@ argument_expression_list
         which = lookupVariable(&scopeOfVariable, &reg, t, $3, currentScope);
         determineAndOutputOneVariable($3, reg, which, t);
         resolveType(t, argumentsType);
-        printf("in left: %s\n", argumentsType);
+        // printf("in left: %s\n", argumentsType);
     }
 ;
 
@@ -533,7 +527,7 @@ type
 ;
 
 id_expression
-    : ID { printf("ID???? %s\n", yytext); strcpy($$, yytext); }
+    : ID { strcpy($$, yytext); }
 ;
 
 %%
@@ -584,7 +578,7 @@ void create_symbol() {
     }
 }
 
-void insert_symbol(char* myType, char* name, char* entryType, char* returnType, int myScope, bool isForward) {
+void insert_symbol(char* myType, char* name, char* entryType, int myScope, bool isForward) {
     // Create the new node
     variable_t* node = (variable_t*)malloc(sizeof(variable_t));
     // printf("currr: %s\n", name);
@@ -599,13 +593,9 @@ void insert_symbol(char* myType, char* name, char* entryType, char* returnType, 
     } else {
         node->reg = -1;
     }
-    // If returnType != NULL, meaning that this node is a function
-    if (returnType) {
-        strcpy(node->returnType, returnType);
-    }
     strcpy(node->name, name);
     strcpy(node->entryType, entryType);
-    strcpy(node->myType,myType);
+    strcpy(node->myType, myType);
     // Append the list inside the function if it is a parameter
     if (strcmp(entryType, "parameter") == 0) {
         if (!parameters) {
@@ -683,14 +673,15 @@ int lookupRegForJasmin (char* name, int scope) {
 }
 
 int lookupVariable (int* targetScope, int* targetReg, char* targetType, char* name, int scope) {
-    for (int i = 0; i <= scope; i++) {
+    for (int i = scope; i >= 0; i--) {
         TRAVERSE_SINGLE_LIST_NEW(i) {
             if (strcmp(ptr->name, name) == 0) {
                 *targetScope = ptr->scope;
                 *targetReg = ptr->reg;
                 strcpy(targetType, ptr->myType);
                 printf("find %s\n", ptr->name);
-                return 3;
+                printf("targetType: %s\n", ptr->myType);
+                return strcmp(ptr->entryType, "function") == 0 ? 4 : 3;
             }
         }
     }
@@ -727,12 +718,29 @@ void lookupFunction(char* name, char* returnType, char* parametersList) {
     TRAVERSE_SINGLE_LIST_NEW(0) {
         if (strcmp(ptr->name, name) == 0) {
             printf("find the function %s\n", name);
-            strcpy(returnType, ptr->returnType);
+            strcpy(returnType, ptr->myType);
             if (ptr->formalParameters) {
                 strcpy(parametersList, ptr->formalParameters);
             }
             return;
         }
+    }
+}
+
+void processingFunctionCall(char* target, bool hasParameters) {
+    char returnType[16] = {0};
+    char parametersList[16] = {0};
+    lookupFunction(target, returnType, parametersList);
+    // Get returnType
+    char buf[16] = {0};
+    resolveType(returnType, buf);
+    if (hasParameters) {
+        char buf1[32] = {0};
+        // convert from "int, int" to "II"
+        convertParameters(parametersList, buf1);
+        outputFunctionCall(target, buf, buf1);
+    } else {
+        outputFunctionCall(target, buf, NULL);
     }
 }
 

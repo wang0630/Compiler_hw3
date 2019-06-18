@@ -23,9 +23,13 @@ void resolveType(char* target, char* buf) {
   }
 }
 
-
+/*
+  If the input function is main, then replace the argumentsType to [Ljava/lang/String;
+  otherwise generate the .method... heading for the function def
+*/
+// --------------------------------------------------------------------------------
 void outputFunctionDef(char* name, char* argumentsType, char* returnType) {
-  // printf("%s %s %s \n", name, argumentsType, returnType);
+  // printf("in outputVariableDef: %s %s %s \n", name, argumentsType, returnType);
   char str[512] = {0};
   if (strcmp(name, "main") == 0) {
     // Replace the argument list for main only
@@ -39,9 +43,10 @@ void outputFunctionDef(char* name, char* argumentsType, char* returnType) {
   );
   writeJasminFile(str);
 }
+// --------------------------------------------------------------------------------
 
 void outputVariableDef(char* name, char* type, char* value, int scope, int reg) {
-  // printf("%s %s %s \n", name, type, value);
+  // printf("in outputVariableDef: %s %s %s \n", name, type, value);
   char str[512] = {0};
   char typestr[32] = {0};
 
@@ -74,7 +79,12 @@ void outputVariable(char* target, int reg, int scope, char* type, int which, cha
   char doOp[32] = {0};
   determineVariables(target, reg, scope, type, type1, which, str);
   determineVariables(target1, reg1, scope1, type1, type, which1, str);
-  // If one of the operands is float
+  
+  /*
+    If one of the operands is float
+    We will use fadd, fsub, fmul, fdiv instead of i-version of those
+  */
+  // --------------------------------------------------------------------------------
   if (strcmp(type, "float") == 0 || strcmp(type1, "float") == 0) {
     strcpy(exprType, "float");
     sprintf(doOp, "\t%c", 'f');
@@ -82,7 +92,7 @@ void outputVariable(char* target, int reg, int scope, char* type, int which, cha
     strcpy(exprType, "int");
     sprintf(doOp, "\t%c", 'i');
   }
-  printf("op: %s\n", op);
+
   // Check for operation
   if (strcmp(op, "+") == 0) {
     strcat(doOp, "add\n");
@@ -95,7 +105,7 @@ void outputVariable(char* target, int reg, int scope, char* type, int which, cha
   } else {
     strcat(doOp, "rem\n");
   }
-
+  // --------------------------------------------------------------------------------
   strcat(str, doOp);
   writeJasminFile(str);
 }
@@ -107,12 +117,9 @@ void determineVariables(char* target, int reg, int scope, char* type, char* type
     case 1: { // const
       char* loadOp = "ldc";
       sprintf(load, "\t%s %s\n", loadOp, target);
-      printf("load a constant: %s", load);
       // check for casting
       if (strcmp(type, type1) != 0) {
-        // printf("type: %s %s\n", type, type1);
         if (strcmp(type, "int") == 0) {
-          // printf("who is the target: %s\n", target);
           strcat(load, "\ti2f\n");
         }
       }
@@ -127,28 +134,37 @@ void determineVariables(char* target, int reg, int scope, char* type, char* type
         sprintf(load, "\t%s %d\n", loadOp, reg);
         printf("load a local variable: %s", load);
 
-        // check for casting
+        /*
+          check for casting
+          if the variable being processed is int and type is different from type1,
+          then cast the variable to float
+        */
+        // --------------------------------------------------------------------------------
         if (strcmp(type, type1) != 0) {
-          // printf("type: %s %s\n", type, type1);
           if (strcmp(type, "int") == 0) {
-            // printf("who is the target: %s\n", target);
             strcat(load, "\ti2f\n");
           }
         }
-      } else { // global
+        // --------------------------------------------------------------------------------
+      } else {
+        // global
         char* loadOp = "getstatic compiler_hw3/";
         char tmp[5] = {0};
         resolveType(type, tmp);
         sprintf(load, "\t%s%s %s\n", loadOp, target, tmp);
         printf("load global: %s", load);
-         // check for casting
+        /*
+          check for casting
+          if the variable being processed is int and type is different from type1,
+          then cast the variable to float
+        */
+        // --------------------------------------------------------------------------------
         if (strcmp(type, type1) != 0) {
-          // printf("type: %s %s\n", type, type1);
           if (strcmp(type, "int") == 0) {
-            // printf("who is the target: %s\n", target);
             strcat(load, "\ti2f\n");
           }
         }
+        // --------------------------------------------------------------------------------
       }
     }
   }
@@ -173,6 +189,9 @@ void determineAndOutputOneVariable(char* target, int reg, int which, char* type)
       break;
     case 1: // const
       sprintf(str, "\tldc %s\n", target);
+      break;
+    case 4: // function call
+      printf("don't do anything in function call\n");
   }
   writeJasminFile(str);
 }
@@ -223,7 +242,6 @@ void outputFunctionCall(char* target, char* returnType, char* paras) {
 void convertParameters(char* target, char* buf) {
   char* ptr = strtok(target, ", ");
   while(ptr) {
-    printf("cutcut: %s\n", ptr);
     char tmp[16] = {0};
     resolveType(ptr, tmp);
     strcat(buf, tmp);
