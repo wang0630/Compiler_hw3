@@ -94,13 +94,13 @@ void outputVariable(char* target, int reg, int scope, char* type, int which, cha
   }
 
   // Check for operation
-  if (strcmp(op, "+") == 0) {
+  if (strcmp(op, "+") == 0 || strcmp(op, "+=") == 0) {
     strcat(doOp, "add\n");
-  } else if(strcmp(op, "-") == 0) {
+  } else if(strcmp(op, "-") == 0 || strcmp(op, "-=") == 0) {
     strcat(doOp, "sub\n");
-  } else if(strcmp(op, "*") == 0) {
+  } else if(strcmp(op, "*") == 0 || strcmp(op, "*=") == 0) {
     strcat(doOp, "mul\n");
-  } else if(strcmp(op, "/") == 0) {
+  } else if(strcmp(op, "/") == 0 || strcmp(op, "/=") == 0) {
     strcat(doOp, "div\n");
   } else {
     strcat(doOp, "rem\n");

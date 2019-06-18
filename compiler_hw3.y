@@ -311,22 +311,38 @@ assignment_expression
         int reg, scopeOfVariable;
         char t[16] = {0};
         int which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
-        // Do the assignment
-        // if exprType is NULL, meaning that there is only one thing on the right handside
-        // ex. a = 3;
-        // need tp look up for the 3
-        if (!exprType) {
-            // printf("one stuff\n");
-            int reg, scopeOfVariable;
-            char t[16] = {0};
-            int which = lookupVariable(&scopeOfVariable, &reg, t, $3, currentScope);
+
+        int reg1, scopeOfVariable1;
+        char t1[16] = {0};
+        int which1 = lookupVariable(&scopeOfVariable1, &reg1, t1, $3, currentScope);
+        /*
+            if the operator is not =,
+            meaning that the LHS has to be loaded and add according to its type,
+            exprType is still NULL here if a += 6 since the RHS has only one operand
+        */
+        // --------------------------------------------------------------------------
+        if (strcmp($2, "=") != 0) {
             exprType = (char*)malloc(bufSize);
-            // Put the type to exprType
-            // Since outputAssignment() only cares about the type of right hand side
-            strcpy(exprType, t);
-            // printf("inside one: %s\n", exprType);
-            determineAndOutputOneVariable($3, reg, which, t);
+            printf("in != =: %s %s %s %s\n", $1, $2, $3, exprType);
+            outputVariable($1, reg, scopeOfVariable, t, which, $3, reg1, scopeOfVariable1, t1, which1, $2, exprType);
+        // --------------------------------------------------------------------------
+        } else {
+            /* 
+                Do the assignment
+                if exprType is NULL, meaning that there is only one thing on the right handside
+                ex. a = 3;
+                need tp look up for the 3
+            */
+            // --------------------------------------------------------------------------
+            if (!exprType) {
+                exprType = (char*)malloc(bufSize);
+                // Put the type to exprType
+                // Since outputAssignment() only cares about the type of right hand side
+                strcpy(exprType, t1);
+                determineAndOutputOneVariable($3, reg1, which1, t1);
+            }
         }
+            // --------------------------------------------------------------------------
         outputAssignment(t, reg, exprType, $2);
         free(exprType);
         exprType = NULL;
@@ -356,8 +372,9 @@ additive_expression
     | additive_expression arithmetic_lower_operator multi_expression {
         if (!exprType) {
             exprType = (char*)malloc(bufSize);
+            memset(exprType, 0, bufSize);
         }
-        //printf("In additive: %s + %s\n", $1, $3);
+        // printf("In additive: %s + %s\n", $1, $3);
         sprintf($$, "%s %s %s", $1, $2, $3);
         int reg, scopeOfVariable, reg1, scopeOfVariable1;
         int which, which1;
@@ -373,15 +390,15 @@ multi_expression
         // printf("in casting %s\n", $1);
     }
     | multi_expression arithmetic_higher_operator cast_expression {
+        if (!exprType) {
+            exprType = (char*)malloc(bufSize);
+            memset(exprType, 0, bufSize);
+        }
         sprintf($$, "%s %s %s", $1, $2, $3);
         // look up the table for this varaible
         int reg, scopeOfVariable, reg1, scopeOfVariable1;
         int which, which1;
         char t[16] = {0}, t1[16] = {0};
-        if (!exprType) {
-            exprType = (char*)malloc(bufSize);
-            memset(exprType, 0, bufSize);
-        }
         which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
         which1 = lookupVariable(&scopeOfVariable1, &reg1, t1, $3, currentScope);
         outputVariable($1, reg, scopeOfVariable, t, which, $3, reg1, scopeOfVariable1, t1, which1, $2, exprType);
@@ -680,7 +697,6 @@ int lookupVariable (int* targetScope, int* targetReg, char* targetType, char* na
                 *targetReg = ptr->reg;
                 strcpy(targetType, ptr->myType);
                 printf("find %s\n", ptr->name);
-                printf("targetType: %s\n", ptr->myType);
                 return strcmp(ptr->entryType, "function") == 0 ? 4 : 3;
             }
         }
