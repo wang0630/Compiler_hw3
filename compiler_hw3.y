@@ -142,7 +142,8 @@ declaration
         if (currentScope != 0) {
             reg = lookupRegForJasmin($2, currentScope);
         }
-        outputVariableDef($2, $1, $4, currentScope, reg);
+        printf("in declaration %s\n", exprType);
+        outputVariableDef($2, $1, $4, currentScope, reg, exprType);
      }
     | type id_expression SEMICOLON {
         insert_symbol($1, $2, "variable", currentScope, false);
@@ -150,7 +151,7 @@ declaration
         if (currentScope != 0) {
             reg = lookupRegForJasmin($2, currentScope);
         }
-        outputVariableDef($2, $1, NULL, currentScope, reg);
+        outputVariableDef($2, $1, NULL, currentScope, reg, exprType);
     }
     | type id_expression LB func_item_list RB {
         insert_symbol($1, $2, "function", currentScope, false);
@@ -295,9 +296,13 @@ return_expression
     | RET assignment_expression SEMICOLON {
         printf("in return: %s\n", $2);
         printf("exprType: %s\n", exprType);
-        int reg, scopeOfVariable;
+        int reg, scopeOfVariable, which;
         char t[16] = {0};
-        lookupVariable(&scopeOfVariable, &reg, t, $2, currentScope);
+        which = lookupVariable(&scopeOfVariable, &reg, t, $2, currentScope);
+        // If it is only one variable
+        if (which != 2) {
+            determineAndOutputOneVariable($2, reg, which, t);
+        }
         char* r = strcmp(t, "int") == 0 ? "\tireturn\n" : "\tfreturn\n";
         writeJasminFile(r);
         // Free exprType since it won't be used after this return
@@ -344,7 +349,9 @@ assignment_expression
         }
             // --------------------------------------------------------------------------
         outputAssignment(t, reg, exprType, $2);
-        free(exprType);
+        if (exprType) {
+            free(exprType);
+        }
         exprType = NULL;
     }
     | logical_expression {

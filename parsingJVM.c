@@ -45,7 +45,7 @@ void outputFunctionDef(char* name, char* argumentsType, char* returnType) {
 }
 // --------------------------------------------------------------------------------
 
-void outputVariableDef(char* name, char* type, char* value, int scope, int reg) {
+void outputVariableDef(char* name, char* type, char* value, int scope, int reg, char* rightType) {
   // printf("in outputVariableDef: %s %s %s \n", name, type, value);
   char str[512] = {0};
   char typestr[32] = {0};
@@ -63,13 +63,30 @@ void outputVariableDef(char* name, char* type, char* value, int scope, int reg) 
   } else {
     // Local variable
     char load[32] = {0};
-    // 0 is the default value if the value is null
-    sprintf(load, "\tldc %s\n", value ? value : "0");
-    strcat(str, load);
-    char* store = strcmp(type, "float") == 0 ? "fstore" : "istore";
     char store1[32] = {0};
-    sprintf(store1, "\t%s %d\n", store, reg);
-    strcat(str, store1);
+    // Determine which load operation should this variable use
+    char* store = strcmp(type, "float") == 0 ? "fstore" : "istore";
+ 
+    /*
+      rightType is not NULL meaning that the RHS of the declaration is actually a expr
+    */
+    // ------------------------------------------------------------------------------------
+    if (rightType) {
+      // variable tpye is not the same as exprtype, cast the expr according to the variable
+      if (strcmp(type, rightType) != 0) {
+        char* casting = strcmp(type, "float") == 0 ? "\ti2f\n" : "\tf2i\n";
+        strcat(str, casting);
+      }
+      sprintf(store1, "\t%s %d\n", store, reg);
+      strcat(str, store1);
+    // ------------------------------------------------------------------------------------
+    } else {
+      // 0 is the default value if value is not presented
+      sprintf(load, "\tldc %s\n", value ? value : "0");
+      strcat(str, load);
+      sprintf(store1, "\t%s %d\n", store, reg);
+      strcat(str, store1);
+    }
   }
   writeJasminFile(str);
 }
