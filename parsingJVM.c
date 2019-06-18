@@ -209,3 +209,24 @@ void outputPrintFuc(char* target, char* type) {
   sprintf(str, "%s(%s)V\n", op, buf);
   writeJasminFile(str);
 }
+
+void outputFunctionCall(char* target, char* returnType, char* paras) {
+  char str[512] = {0};
+  if (paras) {
+    sprintf(str, "\tinvokestatic compiler_hw3/%s(%s)%s\n", target, paras, returnType);
+  } else {
+    sprintf(str, "\tinvokestatic compiler_hw3/%s()%s\n", target, returnType);
+  }
+  writeJasminFile(str);
+}
+
+void convertParameters(char* target, char* buf) {
+  char* ptr = strtok(target, ", ");
+  while(ptr) {
+    printf("cutcut: %s\n", ptr);
+    char tmp[16] = {0};
+    resolveType(ptr, tmp);
+    strcat(buf, tmp);
+    ptr = strtok(NULL, ", ");
+  }
+}

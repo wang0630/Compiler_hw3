@@ -190,7 +190,7 @@ compound_stat
         shouldDumpNow = true;
         if (currentScope == 1) {
             // Generate end method to Jasmin
-            char* str = ".end method";
+            char* str = ".end method\n";
             writeJasminFile(str);
         }
         --currentScope;
@@ -230,10 +230,12 @@ print_func
 
 primary_expression
 	: ID {
+        printf("IDzzssss: %s\n", yytext);
         lookup_symbol(yytext, false, false);
         if (isError) {
             makeError(false, false);
         }
+        strcpy($$, yytext);
     }
 	| constant {
         strcpy($$, $1);
@@ -294,7 +296,6 @@ return_expression
 
 assignment_expression
 	: unary_expression assignment_operator logical_expression {
-        printf("assign: %s\n", $3);
         int reg, scopeOfVariable;
         char t[16] = {0};
         int which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
@@ -358,9 +359,11 @@ additive_expression
 ;
 
 multi_expression
-    : cast_expression
+    : cast_expression {
+        printf("in casting %s\n", $1);
+    }
     | multi_expression arithmetic_higher_operator cast_expression {
-        printf("in mul: %s * %s\n", $1, $3);
+        printf("here: %s %s %s\n", $1, $2, $3);
         sprintf($$, "%s %s %s", $1, $2, $3);
         // look up the table for this varaible
         int reg, scopeOfVariable, reg1, scopeOfVariable1;
@@ -403,6 +406,7 @@ cast_expression
 
 postfix_expression
 	: primary_expression {
+        printf("return from primary: %s\n", $1);
         strcpy($$, $1);
     }
 	| postfix_expression LB RB {
@@ -413,9 +417,13 @@ postfix_expression
         char returnType[16] = {0};
         char parametersList[16] = {0};
         lookupFunction($1, returnType, parametersList);
+        // Get returnType
+        char buf[16] = {0};
+        resolveType(returnType, buf);
+        outputFunctionCall($1, buf, NULL);
         if (isError) {
             makeError(false, true);
-        } 
+        }
     }
 	| postfix_expression LB argument_expression_list RB  {
         // Function call with argument
@@ -423,12 +431,19 @@ postfix_expression
         char returnType[16] = {0};
         char parametersList[32] = {0};
         lookupFunction($1, returnType, parametersList);
-        // printf("rrr: %s %s\n", returnType, parameters);
+        // Get returnType
         char buf[16] = {0};
+        char buf1[32] = {0};
         resolveType(returnType, buf);
+        // convert from int, int to II
+        convertParameters(parametersList, buf1);
+        outputFunctionCall($1, buf, buf1);
         if (isError) {
             makeError(false, true);
         }
+
+        // clear the parametersList(ex. III) buffer
+        memset(parametersList, 0, sizeof(parametersList));
     }
 	| postfix_expression INC
 	| postfix_expression DEC
@@ -518,7 +533,7 @@ type
 ;
 
 id_expression
-    : ID { strcpy($$, yytext); }
+    : ID { printf("ID???? %s\n", yytext); strcpy($$, yytext); }
 ;
 
 %%
@@ -602,7 +617,6 @@ void insert_symbol(char* myType, char* name, char* entryType, char* returnType, 
             char tmp[15] = {0};
             sprintf(tmp, "%s%s", ", ", myType);
             strcat(parameters, tmp);
-            // printf("2 parameters: %s\n", parameters);
         }
     }
 
