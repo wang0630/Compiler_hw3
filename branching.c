@@ -25,9 +25,12 @@ int topID() {
 }
 
 void push(char* br, int id) {
+  // stack is empty
+  if (top < 0) {
+    top++;
+  }
   branchingStack[top]->id = id;
   strcpy(branchingStack[top]->br, br);
-  top++;
 }
 
 branchingNode* pop() {

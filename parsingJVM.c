@@ -289,6 +289,8 @@ void convertParameters(char* target, char* buf) {
 }
 
 void makeLabel(char* buf, char* label, int id) {
-  sprintf(buf, "%s%d:\n", label, id);
-  writeJasminFile(buf);
+  sprintf(buf, "%s%d", label, id);
+  char op[32] = {0};
+  sprintf(op, "%s:\n", buf);
+  writeJasminFile(op);
 }

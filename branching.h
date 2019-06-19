@@ -4,7 +4,7 @@
 
 // 0 for while, 1 for if
 typedef struct branching {
-  char br[8];
+  char br[16];
   int id;
 } branchingNode;
 

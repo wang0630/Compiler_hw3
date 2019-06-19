@@ -207,6 +207,31 @@ compound_stat
             // Generate end method to Jasmin
             char* str = ".end method\n";
             writeJasminFile(str);
+        } else {
+            /*
+                Check if it is while or if and generate the correct label
+                0 for while, 1 for if
+            */
+            // ---------------------------------------------------------------
+            char following[128] = {0};
+            branchingNode* ptr = pop();
+            printf("br: %s\n", ptr->br);
+            switch(ptr->id) {
+                case 0:
+                    // Go to begin!
+                    sprintf(following, "\tgoto %s\n", ptr->br);
+                    writeJasminFile(following);
+                    memset(following, 0, sizeof(following));
+                    // False label and branching
+                    makeLabel(following, WHILE_FALSE, whileID);
+                    // goto EXIT
+                    sprintf(following, "\tgoto %s%d\n", WHILE_EXIT, whileID);
+                    // EXIT:
+                    makeLabel(following, WHILE_EXIT, whileID++);
+                    break;
+            }
+
+            // ---------------------------------------------------------------
         }
         --currentScope;
     }
