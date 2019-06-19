@@ -2,7 +2,7 @@ CC = gcc -g
 YFLAG = -d
 FNAME = compiler_hw3
 PARSER = myparser
-OBJFILE = y.tab.o lex.yy.o parsingJVM.o
+OBJFILE = y.tab.o lex.yy.o parsingJVM.o branching.o
 OBJECT = lex.yy.c y.tab.c y.tab.h ${FNAME}.j ${FNAME}.class
 
 all: ${OBJFILE}
@@ -30,6 +30,14 @@ test_fun:
 	@echo -e "\n\033[1;33mmain.class output\033[0m"
 	@java -jar jasmin.jar ${FNAME}.j
 	@java ${FNAME}
+
+test_while:
+	rm -f *.j
+	@./${PARSER} < ./example_input/basic_while_statement.c
+	@echo -e "\n\033[1;33mmain.class output\033[0m"
+	@java -jar jasmin.jar ${FNAME}.j
+	@java ${FNAME}
+
 
 clean:
 	rm -f *.o ${PARSER} ${OBJECT}

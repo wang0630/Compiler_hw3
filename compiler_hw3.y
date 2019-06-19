@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include "./parsingJVM.h"
+#include "./branching.h"
 #define bufSize 16
 extern int yylineno;
 extern int yylex();
@@ -54,6 +55,15 @@ char parametersType[64] = {0};
 // for function call
 char argumentsType[64] = {0};
 
+int labelID = 0;
+int jumpID = 0;
+int whileID = 0;
+char* WHILE_BEGIN = "Label_begin_";
+char* WHILE_TRUE = "Label_true_";
+char* WHILE_FALSE = "Label_false_";
+char* WHILE_EXIT = "EXIT_";
+// 0 for while, 1 for if, 2 for elseif, 3 for else
+int cur = 0;
 // travser through the list
 #define TRAVERSE_SINGLE_LIST(i) for (variable_t* ptr = symbolTable[i]; ptr; ptr = ptr->next)
 #define TRAVERSE_SINGLE_LIST_NEW(i) for (variable_t* ptr = symbolTable[i]->next; ptr; ptr = ptr->next)
@@ -116,6 +126,9 @@ char argumentsType[64] = {0};
 %type <string> assignment_operator
 %type <string> cast_expression
 %start program
+
+// For relationship
+%type <string> relational_operator
 
 /* Grammar section */
 %%
@@ -224,7 +237,6 @@ print_func
         int reg, scopeOfVariable, which;
         char t[16] = {0};
         which = lookupVariable(&scopeOfVariable, &reg, t, $3, currentScope);
-        // printf("which in print: %d\n", which);
         determineAndOutputOneVariable($3, reg, which, t);
         outputPrintFuc($3, t);
     }
@@ -368,7 +380,50 @@ logical_expression
 ;
 
 relational_expression
-    : relational_expression relational_operator additive_expression
+    : relational_expression relational_operator additive_expression {
+        printf("in relational: %s %s %s\n", $1, $2, $3);
+        int reg, scopeOfVariable, which;
+        char t[16] = {0};
+        which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
+        determineAndOutputOneVariable($1, reg, which, t);
+        /*
+            exprType == NULL, meaning that it is only one operand on the right hand side
+        */
+        // ---------------------------------------------------------------------
+        if (!exprType) {
+            exprType = (char*)malloc(sizeof(bufSize));
+            int reg, scopeOfVariable, which;
+            char t[16] = {0};
+            which = lookupVariable(&scopeOfVariable, &reg, t, $3, currentScope);
+            determineAndOutputOneVariable($3, reg, which, t);
+            strcpy(exprType, t);
+        }
+        // ---------------------------------------------------------------------
+        /*
+            Generating the true branching,
+            Determine we are encountering while or if branching
+            0 for while, 1 for if,
+            we already have the true branching, determine if we need to generate another label or not
+        */
+        // ---------------------------------------------------------------------
+        char whichLabel[16] = {0};
+        char following[32] = {0};
+        int decision = topID();
+        switch(decision) {
+            case 0:
+                // Make the true label for branching
+                sprintf(whichLabel, "%s%d", WHILE_TRUE, whileID);
+                outputBr($2, exprType, whichLabel);
+                // Make the goto WHILE_FASLE operation
+                sprintf(following, "\tgoto %s%d\n", WHILE_FALSE, whileID);
+                writeJasminFile(following);
+                // Make WHILE_TRUE:
+                memset(following, 0, sizeof(following));
+                makeLabel(following, WHILE_TRUE, whileID);
+                break;
+        }
+        // ---------------------------------------------------------------------
+    }
     | additive_expression {
         strcpy($$, $1);
     }
@@ -413,12 +468,24 @@ multi_expression
 ;
 
 relational_operator
-    : MT
-    | LT
-    | MTE
-    | LTE
-    | EQ
-    | NE
+    : MT {
+        strcpy($$, ">");
+    }
+    | LT {
+        strcpy($$, "<");
+    }
+    | MTE {
+        strcpy($$, ">=");
+    }
+    | LTE {
+        strcpy($$, "<=");
+    }
+    | EQ {
+        strcpy($$, "==");
+    }
+    | NE {
+        strcpy($$, "!=");
+    }
 ;
 
 unary_expression
@@ -459,9 +526,6 @@ postfix_expression
         if (isError) {
             makeError(false, true);
         }
-
-        // clear the parametersList(ex. III) buffer
-        // memset(parametersList, 0, sizeof(parametersList));
     }
 	| postfix_expression INC
 	| postfix_expression DEC
@@ -537,7 +601,10 @@ selection_statement
 ;
 
 iteration_statement
-    : WHILE LB expression RB compound_stat
+    : WHILE { char buf[32] = {0}; makeLabel(buf, WHILE_BEGIN, whileID); push(buf, 0); } LB expression RB compound_stat {
+        // char s[16] = 
+        // outputBr($2);
+    }
     | FOR LB declaration expression_stat expression RB
 ;
 
@@ -562,6 +629,7 @@ int main(int argc, char** argv)
     char* fileTitle = ".class public compiler_hw3\n.super java/lang/Object\n";
     writeJasminFile(fileTitle);
     create_symbol();
+    stackInit();
     yylineno = 0;
 
     yyparse();
@@ -570,6 +638,7 @@ int main(int argc, char** argv)
         free(symbolTable[i]);
     }
 	printf("\nTotal lines: %d \n",yylineno);
+    stackClear();
     return 0;
 }
 

@@ -256,6 +256,28 @@ void outputFunctionCall(char* target, char* returnType, char* paras) {
   writeJasminFile(str);
 }
 
+void outputBr(char* op, char* type, char* label) {
+  char str[512] = {0};
+  char* sub = strcmp(type, "float") == 0 ? "\tfsub\n" : "\tisub\n";
+  char r[64] = {0};
+  if (strcmp(op, "<") == 0) {
+    sprintf(r, "\tiflt %s\n", label);
+  } else if (strcmp(op, ">") == 0) {
+    sprintf(r, "\tifgt %s\n", label);
+  } else if (strcmp(op, "<=") == 0) {
+    sprintf(r, "\tifle %s\n", label);
+  } else if (strcmp(op, ">=") == 0) {
+    sprintf(r, "\tifge %s\n", label);
+  } else if (strcmp(op, "==") == 0) {
+    sprintf(r, "\tifeq %s\n", label);
+  } else if (strcmp(op, "!=") == 0) {
+    sprintf(r, "\tifne %s\n", label);
+  }
+  sprintf(str, "%s%s", sub, r);
+  // printf("%s", str);
+  writeJasminFile(str);
+}
+
 void convertParameters(char* target, char* buf) {
   char* ptr = strtok(target, ", ");
   while(ptr) {
@@ -264,4 +286,9 @@ void convertParameters(char* target, char* buf) {
     strcat(buf, tmp);
     ptr = strtok(NULL, ", ");
   }
+}
+
+void makeLabel(char* buf, char* label, int id) {
+  sprintf(buf, "%s%d:\n", label, id);
+  writeJasminFile(buf);
 }
