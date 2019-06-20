@@ -481,6 +481,7 @@ relational_expression
         char whichLabel1[16] = {0};
         char following[32] = {0};
         int decision = topID();
+        char buf[32] = {0}; 
         printf("decision: %d\n", decision);
         char * topbr;
         switch(decision) {
@@ -496,6 +497,8 @@ relational_expression
                 makeLabel(following, WHILE_TRUE, whileID);
                 break;
             case 1:
+            case -1:
+                makeLabel(buf, IF_BEGIN, ifID++); push(buf, 1);
                 // Make the true label for branching
                 // if (...) should branch to IF_BEGIN_1
                 printf("In case 1 of relational statement\n");
@@ -701,8 +704,8 @@ assignment_operator
 ;
 
 selection_statement
-    : IF { char buf[32] = {0}; makeLabel(buf, IF_BEGIN, ifID++); push(buf, 1); } LB expression RB stat ELSE { char buf[32] = {0}; makeLabel(buf, IF_BEGIN, ifID); push(buf, 2); } stat
-    | IF { char buf[32] = {0}; makeLabel(buf, IF_BEGIN, ifID++); push(buf, 1); } LB expression RB stat
+    : IF LB expression RB stat ELSE { char buf[32] = {0}; makeLabel(buf, IF_BEGIN, ifID); push(buf, 2); } stat
+    | IF LB expression RB stat
 ;
 
 iteration_statement

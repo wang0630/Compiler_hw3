@@ -289,7 +289,6 @@ void outputBr(char* op, char* type, char* label) {
     sprintf(r, "\tifne %s\n", label);
   }
   sprintf(str, "%s%s", sub, r);
-  // printf("%s", str);
   writeJasminFile(str);
 }
 
