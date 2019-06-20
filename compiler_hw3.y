@@ -240,10 +240,18 @@ compound_stat
                     makeLabel(following, WHILE_EXIT, whileID++);
                     break;
                 case 1:
+                    ptr = pop();
                     printf("Leaving the if statement\n");
                     sprintf(following, "\tgoto %s%d\n", IF_EXIT, ifexitID);
                     writeJasminFile(following);
-                    // Get the label from stack (no pop)
+                    break;
+                case 2:
+                    ptr = pop();
+                    char buf[16] = {0};
+                    sprintf(following, "\tgoto %s%d\n", IF_EXIT, ifexitID);
+                    writeJasminFile(following);
+                    // plus the exit counter since we left the else
+                    makeLabel(buf, IF_EXIT, ifexitID++);
             }
 
             // ---------------------------------------------------------------
@@ -270,11 +278,18 @@ print_func
     : PRINT LB constant RB SEMICOLON {
         // load the string
         printf("In print: %s\n", $3);
-        // determineAndOutputOneVariable($3, -1, 1, NULL);
         char following[64] = {0};
-        sprintf(following, "\tldc \"%s\"\n", $3);
-        writeJasminFile(following);
-        outputPrintFuc($3, "Ljava/lang/String;");
+        char t[32] = {0};
+        if ($3[0] == '"') { // must be string
+            strcpy(t, "Ljava/lang/String;");
+            sprintf(following, "\tldc %s\n", $3);
+            writeJasminFile(following);
+        } else { // must be const
+            int reg, scopeOfVariable, which;
+            which = lookupVariable(&scopeOfVariable, &reg, t, $3, currentScope);
+            determineAndOutputOneVariable($3, reg, which, t);
+        }
+        outputPrintFuc($3, t);
     }
     | PRINT LB primary_expression RB SEMICOLON {
         // load either global or variable
@@ -315,7 +330,7 @@ constant
     }
     | QUOTA STR_CONST_expression QUOTA {
         char str[64] = {0};
-        sprintf(str, "%s", $2);
+        sprintf(str, "\"%s\"", $2);
         strcpy($$, str);
     }
     | TRUE {
@@ -447,7 +462,8 @@ relational_expression
             exprType == NULL, meaning that it is only one operand on the right hand side
         */
         // ---------------------------------------------------------------------
-        if (!exprType) {
+        // if (!exprType) {
+        if(1) {
             exprType = (char*)malloc(sizeof(bufSize));
             int reg, scopeOfVariable, which;
             char t[16] = {0};
@@ -686,7 +702,7 @@ assignment_operator
 ;
 
 selection_statement
-    : IF { char buf[32] = {0}; makeLabel(buf, IF_BEGIN, ifID++); push(buf, 1); } LB expression RB stat ELSE {  } stat
+    : IF { char buf[32] = {0}; makeLabel(buf, IF_BEGIN, ifID++); push(buf, 1); } LB expression RB stat ELSE { char buf[32] = {0}; makeLabel(buf, IF_BEGIN, ifID); push(buf, 2); } stat
     | IF { char buf[32] = {0}; makeLabel(buf, IF_BEGIN, ifID++); push(buf, 1); } LB expression RB stat
 ;
 
