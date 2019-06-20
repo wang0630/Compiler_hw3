@@ -108,6 +108,8 @@ int cur = 0;
 %type <string> func_item // To get a single argument type
 
 
+%type <string> STR_CONST_expression
+
 // For variable def
 %type <string> expression
 %type <string> assignment_expression
@@ -168,7 +170,7 @@ declaration
     }
     | type id_expression LB func_item_list RB {
         insert_symbol($1, $2, "function", currentScope, false);
-        char returnType[16] = {0};
+        char returnType[32] = {0};
         resolveType($1, returnType);
         outputFunctionDef($2, parametersType, returnType);
         memset(parametersType, 0, sizeof(parametersType));
@@ -226,6 +228,7 @@ compound_stat
                     makeLabel(following, WHILE_FALSE, whileID);
                     // goto EXIT
                     sprintf(following, "\tgoto %s%d\n", WHILE_EXIT, whileID);
+                    writeJasminFile(following);
                     // EXIT:
                     makeLabel(following, WHILE_EXIT, whileID++);
                     break;
@@ -252,10 +255,14 @@ expression_stat
 ;
 
 print_func
-    : PRINT LB QUOTA STR_CONST QUOTA RB SEMICOLON {
+    : PRINT LB constant RB SEMICOLON {
         // load the string
-       determineAndOutputOneVariable($4, -1, 1, NULL);
-       outputPrintFuc($4, "Ljava/lang/String;");
+        // printf("In print: %s\n", $3);
+        // determineAndOutputOneVariable($3, -1, 1, NULL);
+        char following[64] = {0};
+        sprintf(following, "\tldc \"%s\"\n", $3);
+        writeJasminFile(following);
+        outputPrintFuc($3, "Ljava/lang/String;");
     }
     | PRINT LB primary_expression RB SEMICOLON {
         // load either global or variable
@@ -295,7 +302,7 @@ constant
         sprintf(str, "%d", $1);
         strcpy($$, str);
     }
-    | QUOTA STR_CONST QUOTA {
+    | QUOTA STR_CONST_expression QUOTA {
         char str[64] = {0};
         sprintf(str, "%s", $2);
         strcpy($$, str);
@@ -309,6 +316,12 @@ constant
         char str[8] = {0};
         sprintf(str, "%s", "false");
         strcpy($$, str);
+    }
+;
+
+STR_CONST_expression
+    : STR_CONST {
+        strcpy($$, yytext);
     }
 ;
 
@@ -552,8 +565,27 @@ postfix_expression
             makeError(false, true);
         }
     }
-	| postfix_expression INC
-	| postfix_expression DEC
+	| postfix_expression INC {
+        // printf("in INC: %s\n", $1);
+        int reg, scopeOfVariable, which;
+        char t[16] = {0};
+        which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
+        determineAndOutputOneVariable($1, reg, which, t);
+        char following[128] = {0};
+        sprintf(following, "\tldc 1\n\tiadd\n");
+        writeJasminFile(following);
+        outputAssignment(t, reg, t, "++");
+    }
+	| postfix_expression DEC {
+        int reg, scopeOfVariable, which;
+        char t[16] = {0};
+        which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
+        determineAndOutputOneVariable($1, reg, which, t);
+        char following[128] = {0};
+        sprintf(following, "\tldc 1\n\tisub\n");
+        writeJasminFile(following);
+        outputAssignment(t, reg, t, "--");
+    }
 ;
 
 argument_expression_list
@@ -621,8 +653,12 @@ assignment_operator
 ;
 
 selection_statement
-    : IF LB expression RB compound_stat ELSE compound_stat
-    | IF LB expression RB compound_stat
+    : IF LB expression RB compound_stat ELSE compound_stat {
+
+    }
+    | IF LB expression RB compound_stat {
+
+    }
 ;
 
 iteration_statement
@@ -849,7 +885,7 @@ void processingFunctionCall(char* target, bool hasParameters) {
     char parametersList[16] = {0};
     lookupFunction(target, returnType, parametersList);
     // Get returnType
-    char buf[16] = {0};
+    char buf[32] = {0};
     resolveType(returnType, buf);
     if (hasParameters) {
         char buf1[32] = {0};

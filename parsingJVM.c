@@ -17,7 +17,9 @@ void resolveType(char* target, char* buf) {
   } else if (strcmp(target, "bool") == 0) {
     strcat(buf, "Z");
   } else if(strcmp(target, "string") == 0){
-    strcat(buf, "Ljava/lang/String");
+    strcat(buf, "Ljava/lang/String;");
+  } else if(strcmp(target, "Ljava/lang/String;") == 0) {
+    strcat(buf, "Ljava/lang/String;");
   } else {
     strcat(buf, "V");
   }
@@ -166,7 +168,7 @@ void determineVariables(char* target, int reg, int scope, char* type, char* type
       } else {
         // global
         char* loadOp = "getstatic compiler_hw3/";
-        char tmp[5] = {0};
+        char tmp[32] = {0};
         resolveType(type, tmp);
         sprintf(load, "\t%s%s %s\n", loadOp, target, tmp);
         printf("load global: %s", load);
@@ -196,7 +198,7 @@ void determineAndOutputOneVariable(char* target, int reg, int which, char* type)
     case 3: // variable
       if(reg == -1) { // global
         strcpy(loadOp, "getstatic compiler_hw3/");
-        char tmp[16] = {0};
+        char tmp[32] = {0};
         resolveType(type, tmp);
         sprintf(str, "\t%s%s %s\n", loadOp, target, tmp);
       } else {
@@ -240,7 +242,7 @@ void outputAssignment(char* leftType, int leftReg, char* rightType, char* op) {
 void outputPrintFuc(char* target, char* type) {
   char str[512] = {0};
   char* op = "\tgetstatic java/lang/System/out Ljava/io/PrintStream;\n\tswap\n\tinvokevirtual java/io/PrintStream/println";
-  char buf[16] = {0};
+  char buf[32] = {0};
   resolveType(type, buf);
   sprintf(str, "%s(%s)V\n", op, buf);
   writeJasminFile(str);
@@ -281,7 +283,7 @@ void outputBr(char* op, char* type, char* label) {
 void convertParameters(char* target, char* buf) {
   char* ptr = strtok(target, ", ");
   while(ptr) {
-    char tmp[16] = {0};
+    char tmp[32] = {0};
     resolveType(ptr, tmp);
     strcat(buf, tmp);
     ptr = strtok(NULL, ", ");
