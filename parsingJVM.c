@@ -64,10 +64,19 @@ void outputVariableDef(char* name, char* type, char* value, int scope, int reg, 
     }
   } else {
     // Local variable
+    printf("type: %s\n", type);
     char load[32] = {0};
     char store1[32] = {0};
+    char store[32] = {0};
     // Determine which load operation should this variable use
-    char* store = strcmp(type, "float") == 0 ? "fstore" : "istore";
+    if (strcmp(type, "float") == 0) {
+      strcpy(store, "fstore");
+    } else if (strcmp(type, "string") == 0) {
+      strcpy(store, "astore");
+    } else {
+      strcpy(store, "istore");
+    }
+    // char* store = strcmp(type, "float") == 0 ? "fstore" : "istore";
  
     /*
       rightType is not NULL meaning that the RHS of the declaration is actually a expr
