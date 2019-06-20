@@ -12,6 +12,7 @@ void stackInit();
 void stackClear();
 void push(char* br, int id);
 int topID();
+char* topBr();
 branchingNode* pop();
 
 #endif

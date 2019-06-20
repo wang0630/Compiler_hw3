@@ -70,7 +70,7 @@ id			{letter}+({letter}|{digit})*
 "("		{ CONCAT return LB; }
 ")"		{ CONCAT return RB; }
 "{"		{ CONCAT return LCB; }
-"}"		{ CONCAT printf("%d: %s", lineNumber++, buf); isRCB = true; memset(buf, 0, BUF_SIZE); return RCB; }
+"}"		{ CONCAT /* printf("%d: %s", lineNumber++, buf); */ isRCB = true; memset(buf, 0, BUF_SIZE); return RCB; }
 "["		{ CONCAT return LSB; }
 "]"		{ CONCAT return RSB; }
 ","		{ CONCAT return COMMA; }

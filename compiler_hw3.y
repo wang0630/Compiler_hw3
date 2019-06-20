@@ -55,13 +55,18 @@ char parametersType[64] = {0};
 // for function call
 char argumentsType[64] = {0};
 
-int labelID = 0;
-int jumpID = 0;
+int ifID = 0;
+int ifexitID = 0;
 int whileID = 0;
 char* WHILE_BEGIN = "Label_begin_";
 char* WHILE_TRUE = "Label_true_";
 char* WHILE_FALSE = "Label_false_";
 char* WHILE_EXIT = "EXIT_";
+
+char* IF_BEGIN = "Label_if_";
+char* IF_EXIT = "Label_if_exit_";
+char* ELSEIF_BEGIN = "Label_elseif_";
+char* ELSE_BEGIN = "Label_else_";
 // 0 for while, 1 for if, 2 for elseif, 3 for else
 int cur = 0;
 // travser through the list
@@ -157,7 +162,7 @@ declaration
         if (currentScope != 0) {
             reg = lookupRegForJasmin($2, currentScope);
         }
-        printf("in declaration %s\n", exprType);
+        // printf("in declaration %s\n", exprType);
         outputVariableDef($2, $1, $4, currentScope, reg, exprType);
      }
     | type id_expression SEMICOLON {
@@ -216,11 +221,13 @@ compound_stat
             */
             // ---------------------------------------------------------------
             char following[128] = {0};
-            branchingNode* ptr = pop();
-            printf("br: %s\n", ptr->br);
-            switch(ptr->id) {
+            int decision = topID();
+            branchingNode* ptr = NULL;
+            // printf("br: %s\n", ptr->br);
+            switch(decision) {
                 case 0:
                     // Go to begin!
+                    ptr = pop();
                     sprintf(following, "\tgoto %s\n", ptr->br);
                     writeJasminFile(following);
                     memset(following, 0, sizeof(following));
@@ -232,6 +239,11 @@ compound_stat
                     // EXIT:
                     makeLabel(following, WHILE_EXIT, whileID++);
                     break;
+                case 1:
+                    printf("Leaving the if statement\n");
+                    sprintf(following, "\tgoto %s%d\n", IF_EXIT, ifexitID);
+                    writeJasminFile(following);
+                    // Get the label from stack (no pop)
             }
 
             // ---------------------------------------------------------------
@@ -257,7 +269,7 @@ expression_stat
 print_func
     : PRINT LB constant RB SEMICOLON {
         // load the string
-        // printf("In print: %s\n", $3);
+        printf("In print: %s\n", $3);
         // determineAndOutputOneVariable($3, -1, 1, NULL);
         char following[64] = {0};
         sprintf(following, "\tldc \"%s\"\n", $3);
@@ -276,7 +288,6 @@ print_func
 
 primary_expression
 	: ID {
-        // printf("IDzzssss: %s\n", yytext);
         lookup_symbol(yytext, false, false);
         if (isError) {
             makeError(false, false);
@@ -318,6 +329,14 @@ constant
         strcpy($$, str);
     }
 ;
+
+// STR_EXPR
+//     : STR_CONST_expression {
+//         char str[64] = {0};
+//         sprintf(str, "%s", $1);
+//         strcpy($$, str);
+//     }
+// ;
 
 STR_CONST_expression
     : STR_CONST {
@@ -445,8 +464,11 @@ relational_expression
         */
         // ---------------------------------------------------------------------
         char whichLabel[16] = {0};
+        char whichLabel1[16] = {0};
         char following[32] = {0};
         int decision = topID();
+        printf("decision: %d\n", decision);
+        char * topbr;
         switch(decision) {
             case 0:
                 // Make the true label for branching
@@ -459,6 +481,21 @@ relational_expression
                 memset(following, 0, sizeof(following));
                 makeLabel(following, WHILE_TRUE, whileID);
                 break;
+            case 1:
+                // Make the true label for branching
+                // if (...) should branch to IF_BEGIN_1
+                printf("In case 1 of relational statement\n");
+                sprintf(whichLabel, "%s%d", IF_BEGIN, ifID++);
+                outputBr($2, exprType, whichLabel);
+                // Make the goto IF_BEGIN_2
+                // but don't increase the counter
+                // memset(whichLabel, 0, sizeof(whichLabel));
+                sprintf(whichLabel1, "%s%d", IF_BEGIN, ifID);
+                sprintf(following, "\tgoto %s\n", whichLabel1);
+                // Ouput Label_BEGIN_1 for the statement1
+                strcat(whichLabel, ":\n");
+                strcat(following, whichLabel);
+                writeJasminFile(following);
         }
         // ---------------------------------------------------------------------
     }
@@ -530,8 +567,8 @@ unary_expression
 	: postfix_expression {
         strcpy($$, $1);
     }
-	| INC unary_expression
-	| DEC unary_expression
+	// | INC unary_expression
+	// | DEC unary_expression
 	| unary_operator cast_expression
 ;
 
@@ -539,7 +576,7 @@ cast_expression
     : unary_expression {
         strcpy($$, $1);
     }
-    | LB type RB cast_expression
+    // | LB type RB cast_expression
 ;
 
 postfix_expression
@@ -590,22 +627,18 @@ postfix_expression
 
 argument_expression_list
 	: assignment_expression {
-        // printf("in lislllllt: %s\n", $1);
         int reg, scopeOfVariable, which;
         char t[16] = {0};
         which = lookupVariable(&scopeOfVariable, &reg, t, $1, currentScope);
         determineAndOutputOneVariable($1, reg, which, t);
         resolveType(t, argumentsType);
-        // printf("in lislllllt: %s\n", argumentsType);
     }
 	| argument_expression_list COMMA assignment_expression {
-        // printf("in list left: %s\n", $3);
         int reg, scopeOfVariable, which;
         char t[16] = {0};
         which = lookupVariable(&scopeOfVariable, &reg, t, $3, currentScope);
         determineAndOutputOneVariable($3, reg, which, t);
         resolveType(t, argumentsType);
-        // printf("in left: %s\n", argumentsType);
     }
 ;
 
@@ -653,18 +686,13 @@ assignment_operator
 ;
 
 selection_statement
-    : IF LB expression RB compound_stat ELSE compound_stat {
-
-    }
-    | IF LB expression RB compound_stat {
-
-    }
+    : IF { char buf[32] = {0}; makeLabel(buf, IF_BEGIN, ifID++); push(buf, 1); } LB expression RB stat ELSE {  } stat
+    | IF { char buf[32] = {0}; makeLabel(buf, IF_BEGIN, ifID++); push(buf, 1); } LB expression RB stat
 ;
 
 iteration_statement
     : WHILE { char buf[32] = {0}; makeLabel(buf, WHILE_BEGIN, whileID); push(buf, 0); } LB expression RB compound_stat {
-        // char s[16] = 
-        // outputBr($2);
+
     }
     | FOR LB declaration expression_stat expression RB
 ;
@@ -799,6 +827,21 @@ void insert_symbol(char* myType, char* name, char* entryType, int myScope, bool 
             ptr->next = node;
             break;
         }
+    }
+}
+
+
+void determineIf() {
+    int topid = topID();
+    char buf[32] = {0};
+
+    switch(topid) {
+        case 2: // there is already an if there
+
+            break;
+        default: // push an if
+            makeLabel(buf, IF_BEGIN, ifID++);
+            push(buf, 1);
     }
 }
 

@@ -4,7 +4,7 @@
 #include "branching.h"
 
 // global top
-int top = 0;
+int top = -1;
 // For branching stack
 branchingNode* branchingStack[STACK_SIZE];
 
@@ -21,7 +21,17 @@ void stackClear() {
 }
 
 int topID() {
+  if (top < 0) {
+    return -1;
+  }
   return branchingStack[top]->id;
+}
+
+char* topBr() {
+   if (top < 0) {
+    return NULL;
+  }
+  return branchingStack[top]->br;
 }
 
 void push(char* br, int id) {
