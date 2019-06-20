@@ -164,6 +164,10 @@ declaration
         }
         // printf("in declaration %s\n", exprType);
         outputVariableDef($2, $1, $4, currentScope, reg, exprType);
+        // free exprType after using it,
+        // declaration ends and so does the duty of exprType
+        free(exprType);
+        exprType = NULL;
      }
     | type id_expression SEMICOLON {
         insert_symbol($1, $2, "variable", currentScope, false);
@@ -345,14 +349,6 @@ constant
     }
 ;
 
-// STR_EXPR
-//     : STR_CONST_expression {
-//         char str[64] = {0};
-//         sprintf(str, "%s", $1);
-//         strcpy($$, str);
-//     }
-// ;
-
 STR_CONST_expression
     : STR_CONST {
         strcpy($$, yytext);
@@ -404,6 +400,8 @@ assignment_expression
         int reg1, scopeOfVariable1;
         char t1[16] = {0};
         int which1 = lookupVariable(&scopeOfVariable1, &reg1, t1, $3, currentScope);
+
+        printf("In assignment %s %s %s\n", $1, $2, $3);
         /*
             if the operator is not =,
             meaning that the LHS has to be loaded and add according to its type,
@@ -432,7 +430,7 @@ assignment_expression
             }
         }
             // --------------------------------------------------------------------------
-        outputAssignment(t, reg, exprType, $2);
+        outputAssignment(t, reg, exprType, $2, $1);
         if (exprType) {
             free(exprType);
         }
@@ -585,7 +583,8 @@ unary_expression
     }
 	// | INC unary_expression
 	// | DEC unary_expression
-	| unary_operator cast_expression
+	| unary_operator cast_expression {
+    }
 ;
 
 cast_expression
@@ -627,7 +626,7 @@ postfix_expression
         char following[128] = {0};
         sprintf(following, "\tldc 1\n\tiadd\n");
         writeJasminFile(following);
-        outputAssignment(t, reg, t, "++");
+        outputAssignment(t, reg, t, "++", $1);
     }
 	| postfix_expression DEC {
         int reg, scopeOfVariable, which;
@@ -637,7 +636,7 @@ postfix_expression
         char following[128] = {0};
         sprintf(following, "\tldc 1\n\tisub\n");
         writeJasminFile(following);
-        outputAssignment(t, reg, t, "--");
+        outputAssignment(t, reg, t, "--", $1);
     }
 ;
 

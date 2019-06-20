@@ -7,7 +7,7 @@ void makeLabel(char* buf, char* label, int id);
 void outputFunctionDef(char*, char*, char*);
 void outputVariableDef(char* name, char* type, char* value, int scope, int reg, char* rightType);
 void outputVariable(char* target, int reg, int scope, char* type, int which, char* target1, int reg1, int scope1, char* type1, int which1, char* op, char* exprType);
-void outputAssignment(char* leftType, int leftReg, char* rightType, char* op);
+void outputAssignment(char* leftType, int leftReg, char* rightType, char* op, char* name);
 void outputPrintFuc(char* target, char* type);
 void outputFunctionCall(char* target, char* returnType, char* paras);
 void outputBr(char* op, char* type, char* label);

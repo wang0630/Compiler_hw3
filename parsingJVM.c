@@ -215,7 +215,7 @@ void determineAndOutputOneVariable(char* target, int reg, int which, char* type)
   writeJasminFile(str);
 }
 
-void outputAssignment(char* leftType, int leftReg, char* rightType, char* op) {
+void outputAssignment(char* leftType, int leftReg, char* rightType, char* op, char* name) {
   char str[512] = {0};
   if (strcmp(leftType, rightType) != 0 && strcmp(leftType, "bool") != 0) {
     // Do the implicit casting according to the type of the left side operand
@@ -231,7 +231,11 @@ void outputAssignment(char* leftType, int leftReg, char* rightType, char* op) {
   }
   char s[64] = {0};
   if (leftReg == -1) { // global
-
+    char tmp[32] = {0};
+    resolveType(leftType, tmp);
+    sprintf(s, "\tputstatic compiler_hw3/%s %s\n", name, tmp);
+    // sprintf(str, "\t%s%s %s\n", loadOp, target, tmp);
+    
   } else { // local
     sprintf(s, "\t%cstore %d\n", strcmp(leftType, "float") == 0 ? 'f' : 'i', leftReg);
   }
